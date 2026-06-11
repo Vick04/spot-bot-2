@@ -26,5 +26,21 @@ export function createRouter(observerManager: ObserverManager, symbolManager: Sy
     res.json({ data: state });
   });
 
+  router.get('/debug/observer/:symbol', (req: Request, res: Response) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const state = observerManager.getObserverState(symbol);
+    if (!state) {
+      res.status(404).json({ error: `Symbol ${symbol} not found` });
+      return;
+    }
+    const buffer1m = observerManager.getBuffer1m(symbol);
+    res.json({
+      data: {
+        ...state,
+        buffer1m,
+      },
+    });
+  });
+
   return router;
 }

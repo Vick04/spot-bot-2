@@ -1,17 +1,20 @@
 import { Candle, CandleData, ObserverState } from '../types';
 import { Queue } from '../utils/Queue';
+import { ImpulseTracker } from './ImpulseTracker';
 
 const MA_PERIOD = 99;
 
 export class Observer {
   private symbol: string;
   private queue1m: Queue<Candle>;
+  private impulseTracker: ImpulseTracker;
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
 
   constructor(symbol: string) {
     this.symbol = symbol;
     this.queue1m = new Queue<Candle>(MA_PERIOD);
+    this.impulseTracker = new ImpulseTracker();
   }
 
   preload(candles: Candle[]): void {
@@ -22,6 +25,11 @@ export class Observer {
 
   updateCandle1s(candle: Candle): void {
     this.lastCandle1s = candle;
+
+    const ma99 = this.calculateMA99();
+    if (ma99 !== null) {
+      this.impulseTracker.process(candle.close, ma99);
+    }
   }
 
   updateCandle1m(candle: Candle): void {
@@ -40,6 +48,10 @@ export class Observer {
     return sum / MA_PERIOD;
   }
 
+  getBuffer1m(): Candle[] {
+    return this.queue1m.toArray();
+  }
+
   getState(): ObserverState {
     return {
       symbol: this.symbol,
@@ -47,6 +59,7 @@ export class Observer {
       candle1m: this.lastCandle1m ? toCandleData(this.lastCandle1m) : null,
       ma99: this.calculateMA99(),
       isReady: this.isReady(),
+      impulseTracking: this.impulseTracker.getSnapshot(),
     };
   }
 }

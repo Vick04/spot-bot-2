@@ -40,6 +40,10 @@ export class ObserverManager extends EventEmitter {
     return this.observers.get(symbol)?.getState() ?? null;
   }
 
+  getBuffer1m(symbol: string): Candle[] {
+    return this.observers.get(symbol)?.getBuffer1m() ?? [];
+  }
+
   preloadObserver(symbol: string, candles: Candle[]): void {
     this.observers.get(symbol)?.preload(candles);
   }
