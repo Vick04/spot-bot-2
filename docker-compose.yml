@@ -7,9 +7,6 @@ services:
     volumes:
       - backend_data:/app/data
 
-volumes:
-  backend_data:
-
   frontend:
     build: ./frontend
     restart: unless-stopped
@@ -17,3 +14,6 @@ volumes:
       - "80:80"
     depends_on:
       - backend
+
+volumes:
+  backend_data:
