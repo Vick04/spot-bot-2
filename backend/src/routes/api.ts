@@ -41,6 +41,12 @@ export function createRouter(bot: BotManager): Router {
     res.json({ data: bot.orderManager.getHistory() });
   });
 
+  router.post('/orders/toggle', (_req: Request, res: Response) => {
+    const next = !bot.orderManager.isEnabled();
+    bot.orderManager.setEnabled(next);
+    res.json({ data: bot.orderManager.getStatus() });
+  });
+
   router.get('/debug/observer/:symbol', (req: Request, res: Response) => {
     const symbol = req.params.symbol.toUpperCase();
     const state = bot.observerManager.getObserverState(symbol);

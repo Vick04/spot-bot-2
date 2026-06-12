@@ -1,6 +1,8 @@
 import { OrderStatus, CompletedOrder } from '../types';
 import { fmtPrice, fmtUsdt, fmtDuration } from '../utils/format';
 
+const TOGGLE_URL = 'http://localhost:3000/api/orders/toggle';
+
 interface Props {
   status: OrderStatus;
   history: CompletedOrder[];
@@ -10,12 +12,35 @@ function fmtDate(ts: number): string {
   return new Date(ts).toLocaleTimeString();
 }
 
+function ToggleButton({ enabled }: { enabled: boolean }) {
+  function handleClick() {
+    fetch(TOGGLE_URL, { method: 'POST' });
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+        enabled
+          ? 'bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30'
+          : 'bg-green-500/20 border border-green-500/50 text-green-400 hover:bg-green-500/30'
+      }`}
+    >
+      <span className={`w-2 h-2 rounded-full ${enabled ? 'bg-red-400 animate-pulse' : 'bg-gray-600'}`} />
+      {enabled ? 'Disable OrderManager' : 'Enable OrderManager'}
+    </button>
+  );
+}
+
 function ActiveOrderCard({ status }: { status: OrderStatus }) {
   const o = status.activeOrder;
 
   return (
     <div className="rounded-lg border border-gray-700 p-4 space-y-4">
-      <h2 className="text-xs uppercase tracking-wider text-gray-400">Account</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs uppercase tracking-wider text-gray-400">Account</h2>
+        <ToggleButton enabled={status.enabled} />
+      </div>
 
       <div className="flex gap-8">
         <div>

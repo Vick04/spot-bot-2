@@ -1,9 +1,9 @@
 const EU = 'de-DE';
 
-/** Symbol price with 5 decimal places. E.g. 65.432,12345 */
+/** Symbol price with 7 decimal places. E.g. 65.432,1234567 */
 export function fmtPrice(v: number | null | undefined): string {
   if (v == null) return '—';
-  return v.toLocaleString(EU, { minimumFractionDigits: 5, maximumFractionDigits: 5 });
+  return v.toLocaleString(EU, { minimumFractionDigits: 7, maximumFractionDigits: 7 });
 }
 
 /** USDT amount (balance, profit, spent, received) with 2 decimal places. E.g. 10.000,12 */

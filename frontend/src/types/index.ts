@@ -49,6 +49,7 @@ export interface CompletedOrder {
 }
 
 export interface OrderStatus {
+  enabled: boolean;
   balance: number;
   activeOrder: ActiveOrder | null;
   totalTrades: number;

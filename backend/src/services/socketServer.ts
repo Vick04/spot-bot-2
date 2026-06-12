@@ -36,6 +36,10 @@ export function createSocketServer(
     io.emit('top25', topSymbolsManager.getTop25());
   });
 
+  orderManager.on('toggle', () => {
+    io.emit('order:status', orderManager.getStatus());
+  });
+
   orderManager.on('buy', (order: ActiveOrder) => {
     io.emit('order:status', orderManager.getStatus());
     io.emit('order:buy', order);

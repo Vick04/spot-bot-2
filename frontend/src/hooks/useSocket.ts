@@ -13,6 +13,7 @@ interface SocketStore {
 }
 
 const DEFAULT_ORDER_STATUS: OrderStatus = {
+  enabled: false,
   balance: 0,
   activeOrder: null,
   totalTrades: 0,

@@ -9,12 +9,24 @@ export class OrderManager extends EventEmitter {
   private balance: number = INITIAL_BALANCE;
   private activeOrder: ActiveOrder | null = null;
   private history: CompletedOrder[] = [];
+  private enabled: boolean = false;
+
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  setEnabled(value: boolean): void {
+    this.enabled = value;
+    console.log(`[Order] Manager ${value ? 'ENABLED' : 'DISABLED'}`);
+    this.emit('toggle', value);
+  }
 
   hasActiveOrder(): boolean {
     return this.activeOrder !== null;
   }
 
   buy(symbol: string, price: number): void {
+    if (!this.enabled) return;
     if (this.activeOrder !== null) return;
     if (this.balance <= 0) return;
 
@@ -44,6 +56,7 @@ export class OrderManager extends EventEmitter {
 
   getStatus(): OrderStatus {
     return {
+      enabled: this.enabled,
       balance: this.balance,
       activeOrder: this.activeOrder,
       totalTrades: this.history.length,
