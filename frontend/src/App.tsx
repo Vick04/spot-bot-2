@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSocket } from './hooks/useSocket';
 import { SymbolTable } from './components/SymbolTable';
 import { Top25Table } from './components/Top25Table';
 import { ReadyTable } from './components/ReadyTable';
@@ -13,15 +14,29 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('all');
+  const { observers, top25, connected } = useSocket();
+
+  const observerList = Array.from(observers.values());
+  const readyList = observerList.filter(o => o.impulseTracking.readyToBuy);
+  const top25WithData = top25.map(entry => ({
+    ...entry,
+    obs: observers.get(entry.symbol) ?? null,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <header className="border-b border-gray-800 px-6 py-4">
-        <h1 className="text-xl font-bold tracking-tight">
-          <span className="text-yellow-400">SPOT</span>
-          <span className="text-gray-400 font-light ml-1">BOT v2.0</span>
-        </h1>
-        <p className="text-xs text-gray-500 mt-0.5">Live market observer</p>
+      <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">
+            <span className="text-yellow-400">SPOT</span>
+            <span className="text-gray-400 font-light ml-1">BOT v2.0</span>
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">Live market observer</p>
+        </div>
+        <div className={`flex items-center gap-2 text-xs ${connected ? 'text-green-400' : 'text-red-400'}`}>
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`} />
+          {connected ? 'Connected' : 'Disconnected'}
+        </div>
       </header>
 
       <div className="border-b border-gray-800 px-6">
@@ -37,15 +52,20 @@ export default function App() {
               }`}
             >
               {t.label}
+              {t.id === 'ready' && readyList.length > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-green-500 text-black font-bold">
+                  {readyList.length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
       </div>
 
       <main className="px-6 py-6">
-        {tab === 'all'   && <SymbolTable />}
-        {tab === 'top25' && <Top25Table />}
-        {tab === 'ready' && <ReadyTable />}
+        {tab === 'all'   && <SymbolTable observers={observerList} />}
+        {tab === 'top25' && <Top25Table entries={top25WithData} />}
+        {tab === 'ready' && <ReadyTable observers={readyList} />}
       </main>
     </div>
   );

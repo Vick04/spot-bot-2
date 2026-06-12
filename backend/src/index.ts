@@ -1,7 +1,9 @@
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import { BotManager } from './managers/BotManager';
 import { createRouter } from './routes/api';
+import { createSocketServer } from './services/socketServer';
 
 const PORT = process.env.PORT ?? 3000;
 
@@ -15,7 +17,10 @@ async function main() {
 
   app.use('/api', createRouter(bot));
 
-  app.listen(PORT, () => {
+  const httpServer = http.createServer(app);
+  createSocketServer(httpServer, bot.observerManager, bot.topSymbolsManager);
+
+  httpServer.listen(PORT, () => {
     console.log(`[Server] Listening on http://localhost:${PORT}`);
   });
 

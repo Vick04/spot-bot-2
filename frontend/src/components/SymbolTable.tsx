@@ -1,9 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ObserverData, ApiResponse } from '../types';
-import { useApi } from '../hooks/useApi';
-
-const API_URL = 'http://localhost:3000/api/observers';
-const REFETCH_INTERVAL_MS = 2000;
+import { ObserverData } from '../types';
 
 // ---------------------------------------------------------------------------
 // Sort
@@ -79,10 +75,6 @@ function fmtTime(ms: number | null | undefined): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function fmtBool(v: boolean): string {
-  return v ? '✓' : '✗';
-}
-
 // ---------------------------------------------------------------------------
 // Row
 // ---------------------------------------------------------------------------
@@ -95,19 +87,17 @@ function Row({ obs, index }: { obs: ObserverData; index: number }) {
 
   return (
     <tr className={`${bg} ${dimmed} ${highlight} hover:bg-gray-700 transition-colors text-xs`}>
-      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">
-        {obs.symbol}
-      </td>
+      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">{obs.symbol}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1s?.close)}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1m?.close)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(obs.ma99)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-purple-400">{t.counter}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(t.floor)}</td>
       <td className={`px-3 py-1.5 text-center font-mono ${t.allowed ? 'text-green-400' : 'text-gray-600'}`}>
-        {fmtBool(t.allowed)}
+        {t.allowed ? '✓' : '✗'}
       </td>
       <td className={`px-3 py-1.5 text-center font-mono ${t.reached ? 'text-green-400' : 'text-gray-600'}`}>
-        {fmtBool(t.reached)}
+        {t.reached ? '✓' : '✗'}
       </td>
       <td className="px-3 py-1.5 text-right font-mono text-yellow-400">{fmtTime(t.currentElapsedTime)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-gray-300">{fmtTime(t.averageTime)}</td>
@@ -119,8 +109,9 @@ function Row({ obs, index }: { obs: ObserverData; index: number }) {
 // Table
 // ---------------------------------------------------------------------------
 
-export function SymbolTable() {
-  const { data, loading, error } = useApi<ApiResponse<ObserverData[]>>(API_URL, REFETCH_INTERVAL_MS);
+interface Props { observers: ObserverData[]; }
+
+export function SymbolTable({ observers }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('symbol');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -134,17 +125,9 @@ export function SymbolTable() {
   }
 
   const sorted = useMemo(
-    () => sortObservers(data?.data ?? [], sortKey, sortDir),
-    [data, sortKey, sortDir],
+    () => sortObservers(observers, sortKey, sortDir),
+    [observers, sortKey, sortDir],
   );
-
-  if (loading) {
-    return <div className="flex items-center justify-center h-64 text-gray-400">Connecting to backend...</div>;
-  }
-
-  if (error) {
-    return <div className="flex items-center justify-center h-64 text-red-400">Error: {error}</div>;
-  }
 
   const th = { current: sortKey, dir: sortDir, onSort: handleSort };
 
