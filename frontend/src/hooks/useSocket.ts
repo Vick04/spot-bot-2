@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ObserverData, SymbolHits, OrderStatus, CompletedOrder } from '../types';
 
-const SOCKET_URL = 'http://localhost:3000';
+const SOCKET_URL = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
 
 interface SocketStore {
   observers: Map<string, ObserverData>;

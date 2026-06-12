@@ -1,9 +1,9 @@
 import { OrderStatus, CompletedOrder } from '../types';
 import { fmtPrice, fmtUsdt, fmtDuration } from '../utils/format';
 
-const TOGGLE_URL = 'http://localhost:3000/api/orders/toggle';
-const FORCE_SELL_URL = 'http://localhost:3000/api/orders/force-sell';
-const BOT_RESET_URL = 'http://localhost:3000/api/bot/reset';
+const TOGGLE_URL = '/api/orders/toggle';
+const FORCE_SELL_URL = '/api/orders/force-sell';
+const BOT_RESET_URL = '/api/bot/reset';
 
 interface Props {
   status: OrderStatus;
