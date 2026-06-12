@@ -34,7 +34,10 @@ export class Observer {
 
   updateCandle1m(candle: Candle): void {
     this.lastCandle1m = candle;
-    this.queue1m.push(candle);
+    // Only closed 1m candles feed the MA99 queue
+    if (candle.isClosed) {
+      this.queue1m.push(candle);
+    }
   }
 
   isReady(): boolean {

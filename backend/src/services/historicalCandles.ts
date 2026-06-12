@@ -30,10 +30,11 @@ function parseRow(symbol: string, row: BinanceKlineRow): Candle {
     symbol,
     timeframe: '1m',
     openTime: row[0],
-    open:  parseFloat(row[1]),
-    high:  parseFloat(row[2]),
-    low:   parseFloat(row[3]),
-    close: parseFloat(row[4]),
+    open:     parseFloat(row[1]),
+    high:     parseFloat(row[2]),
+    low:      parseFloat(row[3]),
+    close:    parseFloat(row[4]),
+    isClosed: true,  // historical candles are always closed
   };
 }
 

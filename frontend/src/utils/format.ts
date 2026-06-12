@@ -1,12 +1,12 @@
 const EU = 'de-DE';
 
-/** Price with up to 2 decimal places, European separators. E.g. 65.432,12 */
+/** Symbol price with 5 decimal places. E.g. 65.432,12345 */
 export function fmtPrice(v: number | null | undefined): string {
   if (v == null) return '—';
-  return v.toLocaleString(EU, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v.toLocaleString(EU, { minimumFractionDigits: 5, maximumFractionDigits: 5 });
 }
 
-/** USDT amount with exactly 2 decimal places. E.g. 10.000,12 */
+/** USDT amount (balance, profit, spent, received) with 2 decimal places. E.g. 10.000,12 */
 export function fmtUsdt(v: number | null | undefined): string {
   if (v == null) return '—';
   return v.toLocaleString(EU, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

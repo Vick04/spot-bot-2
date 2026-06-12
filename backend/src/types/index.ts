@@ -8,6 +8,7 @@ export interface Candle {
   high: number;
   low: number;
   close: number;
+  isClosed: boolean;
 }
 
 export interface CandleData {

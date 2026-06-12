@@ -82,6 +82,7 @@ export class BinanceWebSocket extends EventEmitter {
       high: parseFloat(k.h),
       low: parseFloat(k.l),
       close: parseFloat(k.c),
+      isClosed: k.x,
     };
 
     this.emit('candle', candle);
