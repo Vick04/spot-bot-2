@@ -1,12 +1,77 @@
-import { ObserverData, ApiResponse, ImpulseTrackingSnapshot } from '../types';
+import { useState, useMemo } from 'react';
+import { ObserverData, ApiResponse } from '../types';
 import { useApi } from '../hooks/useApi';
 
 const API_URL = 'http://localhost:3000/api/observers';
 const REFETCH_INTERVAL_MS = 2000;
 
-function fmtPrice(value: number | null | undefined): string {
-  if (value == null) return '—';
-  return value.toFixed(8);
+// ---------------------------------------------------------------------------
+// Sort
+// ---------------------------------------------------------------------------
+
+type SortKey = 'symbol' | 'close1s' | 'close1m' | 'ma99' | 'hits' | 'floor' | 'allowed' | 'reached' | 'elapsed' | 'avg';
+type SortDir = 'asc' | 'desc';
+
+function getValue(obs: ObserverData, key: SortKey): string | number {
+  const t = obs.impulseTracking;
+  switch (key) {
+    case 'symbol':  return obs.symbol;
+    case 'close1s': return obs.candle1s?.close     ?? -Infinity;
+    case 'close1m': return obs.candle1m?.close     ?? -Infinity;
+    case 'ma99':    return obs.ma99                ?? -Infinity;
+    case 'hits':    return t.counter;
+    case 'floor':   return t.floor                 ?? -Infinity;
+    case 'allowed': return t.allowed ? 1 : 0;
+    case 'reached': return t.reached ? 1 : 0;
+    case 'elapsed': return t.currentElapsedTime    ?? -Infinity;
+    case 'avg':     return t.averageTime           ?? -Infinity;
+  }
+}
+
+function sortObservers(list: ObserverData[], key: SortKey, dir: SortDir): ObserverData[] {
+  return [...list].sort((a, b) => {
+    const av = getValue(a, key);
+    const bv = getValue(b, key);
+    if (av < bv) return dir === 'asc' ? -1 : 1;
+    if (av > bv) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Header cell
+// ---------------------------------------------------------------------------
+
+interface ThProps {
+  label: string;
+  sortKey: SortKey;
+  current: SortKey;
+  dir: SortDir;
+  align?: 'left' | 'right' | 'center';
+  onSort: (key: SortKey) => void;
+}
+
+function Th({ label, sortKey, current, dir, align = 'right', onSort }: ThProps) {
+  const active = current === sortKey;
+  const arrow = active ? (dir === 'asc' ? ' ↑' : ' ↓') : '';
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      className={`px-3 py-3 text-${align} uppercase text-xs tracking-wider cursor-pointer select-none whitespace-nowrap
+        ${active ? 'text-white' : 'text-gray-400'} hover:text-gray-200 transition-colors`}
+    >
+      {label}{arrow}
+    </th>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Formatters
+// ---------------------------------------------------------------------------
+
+function fmtPrice(v: number | null | undefined): string {
+  if (v == null) return '—';
+  return v.toFixed(8);
 }
 
 function fmtTime(ms: number | null | undefined): string {
@@ -14,100 +79,101 @@ function fmtTime(ms: number | null | undefined): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function Flag({ active, label }: { active: boolean; label: string }) {
-  return (
-    <span className={active ? 'text-green-400 font-semibold' : 'text-gray-600'}>
-      {active ? '✓' : '✗'} {label}
-    </span>
-  );
+function fmtBool(v: boolean): string {
+  return v ? '✓' : '✗';
 }
 
-function ImpulseCell({ t }: { t: ImpulseTrackingSnapshot }) {
-  return (
-    <div className="flex flex-col gap-0.5 text-xs">
-      <div className="flex gap-3">
-        <Flag active={t.allowed} label="allowed" />
-        <Flag active={t.readyToBuy} label="ready" />
-      </div>
-      <div className="text-gray-400">
-        floor: <span className="text-gray-200">{fmtPrice(t.floor)}</span>
-        {t.currentElapsedTime != null && (
-          <span className="ml-2 text-yellow-400">{fmtTime(t.currentElapsedTime)}</span>
-        )}
-      </div>
-      <div className="text-gray-400">
-        avg: <span className="text-gray-200">{fmtTime(t.averageTime)}</span>
-      </div>
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// Row
+// ---------------------------------------------------------------------------
 
 function Row({ obs, index }: { obs: ObserverData; index: number }) {
+  const t = obs.impulseTracking;
   const bg = index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800';
   const dimmed = !obs.isReady ? 'opacity-40' : '';
-  const highlight = obs.impulseTracking.readyToBuy ? 'ring-1 ring-inset ring-green-500' : '';
+  const highlight = t.readyToBuy ? 'ring-1 ring-inset ring-green-500' : '';
 
   return (
-    <tr className={`${bg} ${dimmed} ${highlight} hover:bg-gray-700 transition-colors`}>
-      <td className="px-4 py-2 font-mono font-semibold text-yellow-400 whitespace-nowrap">
+    <tr className={`${bg} ${dimmed} ${highlight} hover:bg-gray-700 transition-colors text-xs`}>
+      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">
         {obs.symbol}
       </td>
-      <td className="px-4 py-2 text-right font-mono">{fmtPrice(obs.candle1s?.close)}</td>
-      <td className="px-4 py-2 text-right font-mono">{fmtPrice(obs.candle1m?.close)}</td>
-      <td className="px-4 py-2 text-right font-mono text-blue-400">{fmtPrice(obs.ma99)}</td>
-      <td className="px-4 py-2 text-right font-mono text-purple-400">
-        {obs.impulseTracking.counter}
+      <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1s?.close)}</td>
+      <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1m?.close)}</td>
+      <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(obs.ma99)}</td>
+      <td className="px-3 py-1.5 text-right font-mono text-purple-400">{t.counter}</td>
+      <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(t.floor)}</td>
+      <td className={`px-3 py-1.5 text-center font-mono ${t.allowed ? 'text-green-400' : 'text-gray-600'}`}>
+        {fmtBool(t.allowed)}
       </td>
-      <td className="px-4 py-3 min-w-[200px]">
-        <ImpulseCell t={obs.impulseTracking} />
+      <td className={`px-3 py-1.5 text-center font-mono ${t.reached ? 'text-green-400' : 'text-gray-600'}`}>
+        {fmtBool(t.reached)}
       </td>
+      <td className="px-3 py-1.5 text-right font-mono text-yellow-400">{fmtTime(t.currentElapsedTime)}</td>
+      <td className="px-3 py-1.5 text-right font-mono text-gray-300">{fmtTime(t.averageTime)}</td>
     </tr>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Table
+// ---------------------------------------------------------------------------
+
 export function SymbolTable() {
   const { data, loading, error } = useApi<ApiResponse<ObserverData[]>>(API_URL, REFETCH_INTERVAL_MS);
+  const [sortKey, setSortKey] = useState<SortKey>('symbol');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  const sorted = useMemo(
+    () => sortObservers(data?.data ?? [], sortKey, sortDir),
+    [data, sortKey, sortDir],
+  );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
-        Connecting to backend...
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64 text-gray-400">Connecting to backend...</div>;
   }
 
   if (error) {
-    return (
-      <div className="flex items-center justify-center h-64 text-red-400">
-        Error: {error}
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64 text-red-400">Error: {error}</div>;
   }
 
-  const observers = data?.data ?? [];
+  const th = { current: sortKey, dir: sortDir, onSort: handleSort };
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-700">
-      <table className="w-full text-sm text-gray-100">
+      <table className="w-full text-gray-100">
         <thead>
-          <tr className="bg-gray-950 text-gray-400 uppercase text-xs tracking-wider">
-            <th className="px-4 py-3 text-left">Symbol</th>
-            <th className="px-4 py-3 text-right">Close 1s</th>
-            <th className="px-4 py-3 text-right">Close 1m</th>
-            <th className="px-4 py-3 text-right">MA99</th>
-            <th className="px-4 py-3 text-right">Hits</th>
-            <th className="px-4 py-3 text-left">Impulse</th>
+          <tr className="bg-gray-950">
+            <Th label="Symbol"   sortKey="symbol"  align="left"   {...th} />
+            <Th label="Close 1s" sortKey="close1s"                {...th} />
+            <Th label="Close 1m" sortKey="close1m"                {...th} />
+            <Th label="MA99"     sortKey="ma99"                   {...th} />
+            <Th label="Hits"     sortKey="hits"                   {...th} />
+            <Th label="Floor"    sortKey="floor"                  {...th} />
+            <Th label="Allowed"  sortKey="allowed" align="center" {...th} />
+            <Th label="Reached"  sortKey="reached" align="center" {...th} />
+            <Th label="Elapsed"  sortKey="elapsed"                {...th} />
+            <Th label="Avg"      sortKey="avg"                    {...th} />
           </tr>
         </thead>
         <tbody>
-          {observers.length === 0 ? (
+          {sorted.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+              <td colSpan={10} className="px-4 py-8 text-center text-gray-500 text-sm">
                 Waiting for data...
               </td>
             </tr>
           ) : (
-            observers.map((obs, i) => <Row key={obs.symbol} obs={obs} index={i} />)
+            sorted.map((obs, i) => <Row key={obs.symbol} obs={obs} index={i} />)
           )}
         </tbody>
       </table>
