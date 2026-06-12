@@ -4,6 +4,11 @@ services:
     restart: unless-stopped
     expose:
       - "3000"
+    volumes:
+      - backend_data:/app/data
+
+volumes:
+  backend_data:
 
   frontend:
     build: ./frontend
