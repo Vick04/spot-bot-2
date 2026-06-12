@@ -3,18 +3,20 @@ import { useSocket } from './hooks/useSocket';
 import { SymbolTable } from './components/SymbolTable';
 import { Top25Table } from './components/Top25Table';
 import { ReadyTable } from './components/ReadyTable';
+import { OrdersPanel } from './components/OrdersPanel';
 
-type Tab = 'all' | 'top25' | 'ready';
+type Tab = 'all' | 'top25' | 'ready' | 'orders';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'all',   label: 'All Symbols' },
-  { id: 'top25', label: 'Top 25'      },
-  { id: 'ready', label: 'Ready'       },
+  { id: 'all',    label: 'All Symbols' },
+  { id: 'top25',  label: 'Top 25'      },
+  { id: 'ready',  label: 'Ready'       },
+  { id: 'orders', label: 'Orders'      },
 ];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('all');
-  const { observers, top25, connected } = useSocket();
+  const { observers, top25, orderStatus, orderHistory, connected } = useSocket();
 
   const observerList = Array.from(observers.values());
   const readyList = observerList.filter(o => o.impulseTracking.readyToBuy);
@@ -63,9 +65,10 @@ export default function App() {
       </div>
 
       <main className="px-6 py-6">
-        {tab === 'all'   && <SymbolTable observers={observerList} />}
-        {tab === 'top25' && <Top25Table entries={top25WithData} />}
-        {tab === 'ready' && <ReadyTable observers={readyList} />}
+        {tab === 'all'    && <SymbolTable observers={observerList} />}
+        {tab === 'top25'  && <Top25Table entries={top25WithData} />}
+        {tab === 'ready'  && <ReadyTable observers={readyList} />}
+        {tab === 'orders' && <OrdersPanel status={orderStatus} history={orderHistory} />}
       </main>
     </div>
   );

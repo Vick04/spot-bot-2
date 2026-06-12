@@ -28,6 +28,36 @@ export interface ImpulseTrackingSnapshot {
   readyToBuy: boolean;
 }
 
+export interface ActiveOrder {
+  symbol: string;
+  buyPrice: number;
+  quantity: number;
+  targetPrice: number;
+  usdtSpent: number;
+  openedAt: number;
+}
+
+export interface CompletedOrder {
+  symbol: string;
+  buyPrice: number;
+  sellPrice: number;
+  quantity: number;
+  usdtSpent: number;
+  usdtReceived: number;
+  profit: number;
+  profitPct: number;
+  openedAt: number;
+  closedAt: number;
+  durationMs: number;
+}
+
+export interface OrderStatus {
+  balance: number;
+  activeOrder: ActiveOrder | null;
+  totalTrades: number;
+  totalProfit: number;
+}
+
 export interface ObserverState {
   symbol: string;
   candle1s: CandleData | null;

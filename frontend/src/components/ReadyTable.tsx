@@ -1,16 +1,7 @@
 import { ObserverData } from '../types';
+import { fmtPrice, fmtTime } from '../utils/format';
 
 interface Props { observers: ObserverData[]; }
-
-function fmtPrice(v: number | null | undefined): string {
-  if (v == null) return '—';
-  return v.toFixed(8);
-}
-
-function fmtTime(ms: number | null | undefined): string {
-  if (ms == null) return '—';
-  return `${(ms / 1000).toFixed(2)}s`;
-}
 
 function Row({ obs, index }: { obs: ObserverData; index: number }) {
   const t = obs.impulseTracking;

@@ -1,18 +1,9 @@
 import { ObserverData, SymbolHits } from '../types';
+import { fmtPrice, fmtTime } from '../utils/format';
 
 interface Entry extends SymbolHits { obs: ObserverData | null; }
 
 interface Props { entries: Entry[]; }
-
-function fmtPrice(v: number | null | undefined): string {
-  if (v == null) return '—';
-  return v.toFixed(8);
-}
-
-function fmtTime(ms: number | null | undefined): string {
-  if (ms == null) return '—';
-  return `${(ms / 1000).toFixed(2)}s`;
-}
 
 export function Top25Table({ entries }: Props) {
   if (entries.length === 0) {

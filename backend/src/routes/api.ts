@@ -33,6 +33,14 @@ export function createRouter(bot: BotManager): Router {
     res.json({ data: bot.getReadySymbols() });
   });
 
+  router.get('/orders/status', (_req: Request, res: Response) => {
+    res.json({ data: bot.orderManager.getStatus() });
+  });
+
+  router.get('/orders/history', (_req: Request, res: Response) => {
+    res.json({ data: bot.orderManager.getHistory() });
+  });
+
   router.get('/debug/observer/:symbol', (req: Request, res: Response) => {
     const symbol = req.params.symbol.toUpperCase();
     const state = bot.observerManager.getObserverState(symbol);

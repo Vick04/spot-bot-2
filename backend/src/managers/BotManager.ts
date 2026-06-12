@@ -1,6 +1,7 @@
 import { SymbolManager } from '../services/symbolManager';
 import { ObserverManager } from './ObserverManager';
 import { TopSymbolsManager } from './TopSymbolsManager';
+import { OrderManager } from './OrderManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
 import { fetchHistoricalCandles } from '../services/historicalCandles';
 import { ObserverState } from '../types';
@@ -9,12 +10,14 @@ export class BotManager {
   readonly symbolManager: SymbolManager;
   readonly observerManager: ObserverManager;
   readonly topSymbolsManager: TopSymbolsManager;
+  readonly orderManager: OrderManager;
   private ws: BinanceWebSocket | null = null;
 
   constructor() {
     this.symbolManager = new SymbolManager();
     this.observerManager = new ObserverManager();
     this.topSymbolsManager = new TopSymbolsManager();
+    this.orderManager = new OrderManager();
   }
 
   async start(): Promise<void> {
@@ -22,11 +25,28 @@ export class BotManager {
 
     const symbols = this.symbolManager.getSymbols();
     this.observerManager.createObservers(symbols);
-
     await this.preloadObservers(symbols);
 
     this.observerManager.on('hit', ({ symbol, counter }: { symbol: string; counter: number }) => {
       this.topSymbolsManager.registerHit(symbol, counter);
+    });
+
+    this.observerManager.on('candle', ({ symbol, timeframe, state }: { symbol: string; timeframe: string; state: ObserverState }) => {
+      if (timeframe !== '1s') return;
+
+      const price = state.candle1s?.close;
+      if (price == null) return;
+
+      // Check sell condition first
+      this.orderManager.onPriceTick(symbol, price);
+
+      // Check buy condition: symbol must be readyToBuy and in top 25
+      if (!this.orderManager.hasActiveOrder() && state.impulseTracking.readyToBuy) {
+        const inTop25 = this.topSymbolsManager.getTop25Symbols().includes(symbol);
+        if (inTop25) {
+          this.orderManager.buy(symbol, price);
+        }
+      }
     });
 
     this.ws = new BinanceWebSocket(symbols);
@@ -34,10 +54,6 @@ export class BotManager {
     this.ws.connect();
   }
 
-  /**
-   * Returns the top 25 symbols (by hits) that currently have
-   * allowed = true and elapsed <= 10s (readyToBuy).
-   */
   getReadySymbols(): ObserverState[] {
     return this.topSymbolsManager
       .getTop25Symbols()
