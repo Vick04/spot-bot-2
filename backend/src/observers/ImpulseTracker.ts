@@ -84,6 +84,18 @@ export class ImpulseTracker {
     };
   }
 
+  /** Full reset including counter and timings history. */
+  resetAll(): void {
+    this.floor = undefined;
+    this.allowed = false;
+    this.reached = false;
+    this.counter = 0;
+    this.ma99AtFloorSet = undefined;
+    this.allowedActivatedAt = null;
+    this.timings = [];
+    this.averageTime = null;
+  }
+
   private reset(): void {
     this.floor = undefined;
     this.allowed = false;

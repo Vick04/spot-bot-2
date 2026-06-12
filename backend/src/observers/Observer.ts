@@ -51,6 +51,10 @@ export class Observer {
     return sum / MA_PERIOD;
   }
 
+  resetImpulseTracker(): void {
+    this.impulseTracker.resetAll();
+  }
+
   getBuffer1m(): Candle[] {
     return this.queue1m.toArray();
   }

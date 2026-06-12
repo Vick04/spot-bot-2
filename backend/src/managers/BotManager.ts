@@ -54,6 +54,23 @@ export class BotManager {
     this.ws.connect();
   }
 
+  resetBot(): void {
+    this.observerManager.resetAllImpulseTrackers();
+    this.topSymbolsManager.reset();
+    this.orderManager.reset();
+    console.log('[Bot] Reset — impulse trackers, top25 and order state cleared');
+    this.observerManager.emit('reset');
+  }
+
+  forceSell(): void {
+    const order = this.orderManager.getActiveOrder();
+    if (!order) return;
+    const state = this.observerManager.getObserverState(order.symbol);
+    const price = state?.candle1s?.close;
+    if (price == null) return;
+    this.orderManager.forceSell(price);
+  }
+
   getReadySymbols(): ObserverState[] {
     return this.topSymbolsManager
       .getTop25Symbols()

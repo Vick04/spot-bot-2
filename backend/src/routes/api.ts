@@ -47,6 +47,16 @@ export function createRouter(bot: BotManager): Router {
     res.json({ data: bot.orderManager.getStatus() });
   });
 
+  router.post('/orders/force-sell', (_req: Request, res: Response) => {
+    bot.forceSell();
+    res.json({ data: bot.orderManager.getStatus() });
+  });
+
+  router.post('/bot/reset', (_req: Request, res: Response) => {
+    bot.resetBot();
+    res.json({ success: true });
+  });
+
   router.get('/debug/observer/:symbol', (req: Request, res: Response) => {
     const symbol = req.params.symbol.toUpperCase();
     const state = bot.observerManager.getObserverState(symbol);

@@ -22,4 +22,8 @@ export class TopSymbolsManager {
   getTop25Symbols(): string[] {
     return this.getTop25().map(entry => entry.symbol);
   }
+
+  reset(): void {
+    this.hits.clear();
+  }
 }

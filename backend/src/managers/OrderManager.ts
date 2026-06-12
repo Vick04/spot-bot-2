@@ -50,6 +50,19 @@ export class OrderManager extends EventEmitter {
     this.sell(price);
   }
 
+  forceSell(price: number): void {
+    if (!this.activeOrder) return;
+    this.sell(price);
+  }
+
+  reset(): void {
+    this.balance = INITIAL_BALANCE;
+    this.activeOrder = null;
+    this.history = [];
+    console.log('[Order] Reset — balance, active order and history cleared');
+    this.emit('reset');
+  }
+
   getBalance(): number { return this.balance; }
   getActiveOrder(): ActiveOrder | null { return this.activeOrder; }
   getHistory(): CompletedOrder[] { return this.history; }

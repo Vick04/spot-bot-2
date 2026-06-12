@@ -2,6 +2,8 @@ import { OrderStatus, CompletedOrder } from '../types';
 import { fmtPrice, fmtUsdt, fmtDuration } from '../utils/format';
 
 const TOGGLE_URL = 'http://localhost:3000/api/orders/toggle';
+const FORCE_SELL_URL = 'http://localhost:3000/api/orders/force-sell';
+const BOT_RESET_URL = 'http://localhost:3000/api/bot/reset';
 
 interface Props {
   status: OrderStatus;
@@ -32,6 +34,36 @@ function ToggleButton({ enabled }: { enabled: boolean }) {
   );
 }
 
+function ForceSellButton() {
+  function handleClick() {
+    fetch(FORCE_SELL_URL, { method: 'POST' });
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-orange-500/20 border border-orange-500/50 text-orange-400 hover:bg-orange-500/30"
+    >
+      Force Sell
+    </button>
+  );
+}
+
+function ResetBotButton() {
+  function handleClick() {
+    fetch(BOT_RESET_URL, { method: 'POST' });
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-500/20 border border-gray-500/50 text-gray-300 hover:bg-gray-500/30"
+    >
+      Reset Bot
+    </button>
+  );
+}
+
 function ActiveOrderCard({ status }: { status: OrderStatus }) {
   const o = status.activeOrder;
 
@@ -39,7 +71,11 @@ function ActiveOrderCard({ status }: { status: OrderStatus }) {
     <div className="rounded-lg border border-gray-700 p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xs uppercase tracking-wider text-gray-400">Account</h2>
-        <ToggleButton enabled={status.enabled} />
+        <div className="flex items-center gap-2">
+          {o && <ForceSellButton />}
+          <ResetBotButton />
+          <ToggleButton enabled={status.enabled} />
+        </div>
       </div>
 
       <div className="flex gap-8">

@@ -52,6 +52,10 @@ export class ObserverManager extends EventEmitter {
     this.observers.get(symbol)?.preload(candles);
   }
 
+  resetAllImpulseTrackers(): void {
+    this.observers.forEach(obs => obs.resetImpulseTracker());
+  }
+
   getSymbols(): string[] {
     return Array.from(this.observers.keys());
   }

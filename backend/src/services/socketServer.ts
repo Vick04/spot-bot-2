@@ -28,6 +28,15 @@ export function createSocketServer(
     });
   });
 
+  observerManager.on('reset', () => {
+    io.emit('snapshot', {
+      observers: observerManager.getAllStates(),
+      top25: topSymbolsManager.getTop25(),
+      orderStatus: orderManager.getStatus(),
+      orderHistory: orderManager.getHistory(),
+    });
+  });
+
   observerManager.on('candle', ({ symbol, state }) => {
     io.emit('candle', { symbol, state });
   });
