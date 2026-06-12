@@ -19,17 +19,21 @@ export class ObserverManager extends EventEmitter {
     const observer = this.observers.get(candle.symbol);
     if (!observer) return;
 
+    const counterBefore = observer.getState().impulseTracking.counter;
+
     if (candle.timeframe === '1s') {
       observer.updateCandle1s(candle);
     } else if (candle.timeframe === '1m') {
       observer.updateCandle1m(candle);
     }
 
-    this.emit('candle', {
-      symbol: candle.symbol,
-      timeframe: candle.timeframe,
-      state: observer.getState(),
-    });
+    const state = observer.getState();
+
+    if (state.impulseTracking.counter > counterBefore) {
+      this.emit('hit', { symbol: candle.symbol, counter: state.impulseTracking.counter });
+    }
+
+    this.emit('candle', { symbol: candle.symbol, timeframe: candle.timeframe, state });
   }
 
   getAllStates(): ObserverState[] {

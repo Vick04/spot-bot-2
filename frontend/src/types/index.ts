@@ -25,6 +25,11 @@ export interface ObserverData {
   impulseTracking: ImpulseTrackingSnapshot;
 }
 
+export interface SymbolHits {
+  symbol: string;
+  hits: number;
+}
+
 export interface ApiResponse<T> {
   data: T;
 }
