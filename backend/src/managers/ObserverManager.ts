@@ -25,6 +25,10 @@ export class ObserverManager extends EventEmitter {
       observer.updateCandle1s(candle);
     } else if (candle.timeframe === '1m') {
       observer.updateCandle1m(candle);
+    } else if (candle.timeframe === '1h') {
+      observer.updateCandle1h(candle);
+    } else if (candle.timeframe === '1d') {
+      observer.updateCandle1d(candle);
     }
 
     const state = observer.getState();
@@ -50,6 +54,14 @@ export class ObserverManager extends EventEmitter {
 
   preloadObserver(symbol: string, candles: Candle[]): void {
     this.observers.get(symbol)?.preload(candles);
+  }
+
+  preloadObserver1h(symbol: string, candles: Candle[]): void {
+    this.observers.get(symbol)?.preload1h(candles);
+  }
+
+  preloadObserver1d(symbol: string, candles: Candle[]): void {
+    this.observers.get(symbol)?.preload1d(candles);
   }
 
   resetAllImpulseTrackers(): void {

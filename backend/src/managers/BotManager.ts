@@ -3,7 +3,7 @@ import { ObserverManager } from './ObserverManager';
 import { TopSymbolsManager } from './TopSymbolsManager';
 import { OrderManager } from './OrderManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
-import { fetchHistoricalCandles } from '../services/historicalCandles';
+import { fetchHistoricalCandles, fetchHistoricalCandles1h, fetchHistoricalCandles1d } from '../services/historicalCandles';
 import { ObserverState } from '../types';
 
 export class BotManager {
@@ -25,7 +25,11 @@ export class BotManager {
 
     const symbols = this.symbolManager.getSymbols();
     this.observerManager.createObservers(symbols);
-    await this.preloadObservers(symbols);
+    await Promise.all([
+      this.preloadObservers(symbols),
+      this.preloadObservers1h(symbols),
+      this.preloadObservers1d(symbols),
+    ]);
 
     this.observerManager.on('hit', ({ symbol, counter }: { symbol: string; counter: number }) => {
       this.topSymbolsManager.registerHit(symbol, counter);
@@ -95,8 +99,42 @@ export class BotManager {
 
     const ok = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected');
-    failed.forEach(r => console.error('[Preload] Failed:', (r as PromiseRejectedResult).reason));
+    failed.forEach(r => console.error('[Preload 1m] Failed:', (r as PromiseRejectedResult).reason));
 
-    console.log(`[Preload] Done — ${ok}/${symbols.length} observers ready`);
+    console.log(`[Preload 1m] Done — ${ok}/${symbols.length} observers ready`);
+  }
+
+  private async preloadObservers1h(symbols: string[]): Promise<void> {
+    console.log(`[Preload] Fetching historical 1h candles for ${symbols.length} symbols...`);
+
+    const results = await Promise.allSettled(
+      symbols.map(async symbol => {
+        const candles = await fetchHistoricalCandles1h(symbol);
+        this.observerManager.preloadObserver1h(symbol, candles);
+      })
+    );
+
+    const ok = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected');
+    failed.forEach(r => console.error('[Preload 1h] Failed:', (r as PromiseRejectedResult).reason));
+
+    console.log(`[Preload 1h] Done — ${ok}/${symbols.length} observers ready`);
+  }
+
+  private async preloadObservers1d(symbols: string[]): Promise<void> {
+    console.log(`[Preload] Fetching historical 1d candles for ${symbols.length} symbols...`);
+
+    const results = await Promise.allSettled(
+      symbols.map(async symbol => {
+        const candles = await fetchHistoricalCandles1d(symbol);
+        this.observerManager.preloadObserver1d(symbol, candles);
+      })
+    );
+
+    const ok = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected');
+    failed.forEach(r => console.error('[Preload 1d] Failed:', (r as PromiseRejectedResult).reason));
+
+    console.log(`[Preload 1d] Done — ${ok}/${symbols.length} observers ready`);
   }
 }

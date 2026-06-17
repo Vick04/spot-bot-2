@@ -1,6 +1,6 @@
 {
   "name": "spot-bot-backend",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
