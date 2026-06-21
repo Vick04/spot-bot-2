@@ -1,4 +1,4 @@
-export type CandleTimeframe = '1s' | '1m' | '1h' | '1d';
+export type CandleTimeframe = '1s' | '1m';
 
 export interface Candle {
   symbol: string;
@@ -12,12 +12,8 @@ export interface Candle {
 }
 
 export interface CandleData {
-  open: number;
-  high: number;
-  low: number;
   close: number;
   timestamp: number;
-  isClosed: boolean;
 }
 
 export interface ImpulseTrackingSnapshot {
@@ -31,9 +27,6 @@ export interface ImpulseTrackingSnapshot {
   timings: number[];
   averageTime: number | null;
   readyToBuy: boolean;
-  contextValid: boolean;
-  contextValid1h: boolean;
-  contextValid1d: boolean;
 }
 
 export interface ActiveOrder {
@@ -71,8 +64,6 @@ export interface ObserverState {
   symbol: string;
   candle1s: CandleData | null;
   candle1m: CandleData | null;
-  candle1h: CandleData | null;
-  candle1d: CandleData | null;
   ma99: number | null;
   isReady: boolean;
   impulseTracking: ImpulseTrackingSnapshot;

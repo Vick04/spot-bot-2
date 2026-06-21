@@ -1,5 +1,4 @@
 import { ImpulseTrackingSnapshot } from '../types';
-import { ContextValidatorResult } from './ContextValidator';
 
 const ALLOWED_THRESHOLD = 1.008;  // +0.8%
 const REACHED_THRESHOLD = 1.013;  // +1.3%
@@ -14,14 +13,15 @@ export class ImpulseTracker {
   private allowedActivatedAt: number | null = null;
   private timings: number[] = [];
   private averageTime: number | null = null;
-  private lastContext: ContextValidatorResult = { valid: false, valid1h: false, valid1d: false };
 
-  process(close: number, ma99: number, context: ContextValidatorResult): void {
-    this.lastContext = context;
-
-    // Step 1: set floor — both context validators must be true
+  /**
+   * Process a new 1s close price against the current MA99.
+   * Must only be called when MA99 is available.
+   */
+  process(close: number, ma99: number): void {
+    // Step 1: set floor — price dips below MA99
     if (this.floor === undefined) {
-      if (context.valid) {
+      if (close < ma99) {
         this.floor = close;
         this.ma99AtFloorSet = ma99;
         this.allowed = false;
@@ -81,9 +81,6 @@ export class ImpulseTracker {
       timings: this.timings,
       averageTime: this.averageTime,
       readyToBuy: this.readyToBuy,
-      contextValid: this.lastContext.valid,
-      contextValid1h: this.lastContext.valid1h,
-      contextValid1d: this.lastContext.valid1d,
     };
   }
 
@@ -97,7 +94,6 @@ export class ImpulseTracker {
     this.allowedActivatedAt = null;
     this.timings = [];
     this.averageTime = null;
-    this.lastContext = { valid: false, valid1h: false, valid1d: false };
   }
 
   private reset(): void {

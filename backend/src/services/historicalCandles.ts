@@ -45,45 +45,6 @@ function parseRow(symbol: string, row: BinanceKlineRow): Candle {
 export async function fetchHistoricalCandles(symbol: string): Promise<Candle[]> {
   const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=1m&limit=100`;
   const rows = await get<BinanceKlineRow[]>(url);
+  // Drop the last row (open/unconfirmed candle)
   return rows.slice(0, 99).map(row => parseRow(symbol, row));
-}
-
-/**
- * Fetches 21 closed 1h candles + 1 forming candle for a symbol.
- * rows[0..20] = closed, rows[21] = currently forming.
- */
-export async function fetchHistoricalCandles1h(symbol: string): Promise<Candle[]> {
-  const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=1h&limit=22`;
-  const rows = await get<BinanceKlineRow[]>(url);
-  if (!rows || rows.length < 1) return [];
-  return rows.map((row, i) => ({
-    symbol,
-    timeframe: '1h' as const,
-    openTime: row[0],
-    open:     parseFloat(row[1]),
-    high:     parseFloat(row[2]),
-    low:      parseFloat(row[3]),
-    close:    parseFloat(row[4]),
-    isClosed: i < rows.length - 1,
-  }));
-}
-
-/**
- * Fetches 21 closed 1d candles + 1 forming candle for a symbol.
- * rows[0..20] = closed, rows[21] = currently forming.
- */
-export async function fetchHistoricalCandles1d(symbol: string): Promise<Candle[]> {
-  const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=1d&limit=22`;
-  const rows = await get<BinanceKlineRow[]>(url);
-  if (!rows || rows.length < 1) return [];
-  return rows.map((row, i) => ({
-    symbol,
-    timeframe: '1d' as const,
-    openTime: row[0],
-    open:     parseFloat(row[1]),
-    high:     parseFloat(row[2]),
-    low:      parseFloat(row[3]),
-    close:    parseFloat(row[4]),
-    isClosed: i < rows.length - 1,
-  }));
 }
