@@ -1,27 +1,27 @@
 import { useState, useMemo } from 'react';
 import { ObserverData } from '../types';
-import { fmtPrice, fmtTime } from '../utils/format';
+import { fmtPrice, fmtTime, getBinanceLink } from '../utils/format';
 
 // ---------------------------------------------------------------------------
 // Sort
 // ---------------------------------------------------------------------------
 
-type SortKey = 'symbol' | 'close1s' | 'close1m' | 'ma99' | 'hits' | 'floor' | 'allowed' | 'reached' | 'elapsed' | 'avg';
+type SortKey = 'symbol' | 'close1s' | 'close1m' | 'ma99' | 'hits' | 'inPosition' | 'allowed' | 'reached' | 'elapsed' | 'avg';
 type SortDir = 'asc' | 'desc';
 
 function getValue(obs: ObserverData, key: SortKey): string | number {
   const t = obs.impulseTracking;
   switch (key) {
-    case 'symbol':  return obs.symbol;
-    case 'close1s': return obs.candle1s?.close     ?? -Infinity;
-    case 'close1m': return obs.candle1m?.close     ?? -Infinity;
-    case 'ma99':    return obs.ma99                ?? -Infinity;
-    case 'hits':    return t.counter;
-    case 'floor':   return t.floor                 ?? -Infinity;
-    case 'allowed': return t.allowed ? 1 : 0;
-    case 'reached': return t.reached ? 1 : 0;
-    case 'elapsed': return t.currentElapsedTime    ?? -Infinity;
-    case 'avg':     return t.averageTime           ?? -Infinity;
+    case 'symbol':    return obs.symbol;
+    case 'close1s':   return obs.candle1s?.close     ?? -Infinity;
+    case 'close1m':   return obs.candle1m?.close     ?? -Infinity;
+    case 'ma99':      return obs.ma99                ?? -Infinity;
+    case 'hits':      return t.counter;
+    case 'inPosition': return t.inPosition ? 1 : 0;
+    case 'allowed':   return t.allowed ? 1 : 0;
+    case 'reached':   return t.reached ? 1 : 0;
+    case 'elapsed':   return t.currentElapsedTime    ?? -Infinity;
+    case 'avg':       return t.averageTime           ?? -Infinity;
   }
 }
 
@@ -74,12 +74,18 @@ function Row({ obs, index }: { obs: ObserverData; index: number }) {
 
   return (
     <tr className={`${bg} ${dimmed} ${highlight} hover:bg-gray-700 transition-colors text-xs`}>
-      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">{obs.symbol}</td>
+      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">
+        <a href={getBinanceLink(obs.symbol)} target="_blank" rel="noopener noreferrer" className="hover:text-yellow-300 underline">
+          {obs.symbol}
+        </a>
+      </td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1s?.close)}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1m?.close)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(obs.ma99)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-purple-400">{t.counter}</td>
-      <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(t.floor)}</td>
+      <td className={`px-3 py-1.5 text-center font-mono ${t.inPosition ? 'text-green-400' : 'text-gray-600'}`}>
+        {t.inPosition ? '✓' : '✗'}
+      </td>
       <td className={`px-3 py-1.5 text-center font-mono ${t.allowed ? 'text-green-400' : 'text-gray-600'}`}>
         {t.allowed ? '✓' : '✗'}
       </td>
@@ -123,16 +129,16 @@ export function SymbolTable({ observers }: Props) {
       <table className="w-full text-gray-100">
         <thead>
           <tr className="bg-gray-950">
-            <Th label="Symbol"   sortKey="symbol"  align="left"   {...th} />
-            <Th label="Close 1s" sortKey="close1s"                {...th} />
-            <Th label="Close 1m" sortKey="close1m"                {...th} />
-            <Th label="MA99"     sortKey="ma99"                   {...th} />
-            <Th label="Hits"     sortKey="hits"                   {...th} />
-            <Th label="Floor"    sortKey="floor"                  {...th} />
-            <Th label="Allowed"  sortKey="allowed" align="center" {...th} />
-            <Th label="Reached"  sortKey="reached" align="center" {...th} />
-            <Th label="Elapsed"  sortKey="elapsed"                {...th} />
-            <Th label="Avg"      sortKey="avg"                    {...th} />
+            <Th label="Symbol"      sortKey="symbol"      align="left"   {...th} />
+            <Th label="Close 1s"    sortKey="close1s"                    {...th} />
+            <Th label="Close 1m"    sortKey="close1m"                    {...th} />
+            <Th label="MA99"        sortKey="ma99"                       {...th} />
+            <Th label="Hits"        sortKey="hits"                       {...th} />
+            <Th label="In Position" sortKey="inPosition" align="center"  {...th} />
+            <Th label="Allowed"     sortKey="allowed"    align="center"  {...th} />
+            <Th label="Reached"     sortKey="reached"    align="center"  {...th} />
+            <Th label="Elapsed"     sortKey="elapsed"                    {...th} />
+            <Th label="Avg"         sortKey="avg"                        {...th} />
           </tr>
         </thead>
         <tbody>

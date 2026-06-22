@@ -1,51 +1,39 @@
 import { ImpulseTrackingSnapshot } from '../types';
 
-const ALLOWED_THRESHOLD = 1.008;  // +0.8%
-const REACHED_THRESHOLD = 1.013;  // +1.3%
+const REACHED_MULT = 1.003;  // +0.3%
 const READY_TO_BUY_WINDOW_MS = 10_000;
 
 export class ImpulseTracker {
-  private floor: number | undefined = undefined;
+  private inPosition = false;
   private allowed = false;
   private reached = false;
   private counter = 0;
-  private ma99AtFloorSet: number | undefined = undefined;
+  private allowedPrice: number | undefined = undefined;
   private allowedActivatedAt: number | null = null;
   private timings: number[] = [];
   private averageTime: number | null = null;
 
-  /**
-   * Process a new 1s close price against the current MA99.
-   * Must only be called when MA99 is available.
-   */
-  process(close: number, ma99: number): void {
-    // Step 1: set floor — price dips below MA99
-    if (this.floor === undefined) {
-      if (close < ma99) {
-        this.floor = close;
-        this.ma99AtFloorSet = ma99;
-        this.allowed = false;
-        this.reached = false;
-      }
-      return;
-    }
+  process(close: number, ma20: number, ma99: number, prevBBUpper: number, prevMa20: number): void {
+    // Step 1: inPosition — ma20 > ma99
+    this.inPosition = ma20 > ma99;
 
-    // Step 2: update floor to lower low
-    if (close < this.floor) {
-      this.floor = close;
+    if (!this.inPosition) {
       this.allowed = false;
       this.reached = false;
+      this.allowedPrice = undefined;
+      this.allowedActivatedAt = null;
       return;
     }
 
-    // Step 3: allow — price recovers +0.8% from floor
-    if (!this.allowed && close >= this.floor * ALLOWED_THRESHOLD) {
+    // Step 2: allowed — inPosition is true AND price > prevBBUpper
+    if (!this.allowed && close > prevBBUpper) {
       this.allowed = true;
+      this.allowedPrice = close;
       this.allowedActivatedAt = Date.now();
     }
 
-    // Step 4: reached — price hits +1.3% from floor
-    if (!this.reached && close >= this.floor * REACHED_THRESHOLD) {
+    // Step 3: reached — price > allowedPrice * 1.003
+    if (!this.reached && this.allowedPrice !== undefined && close >= this.allowedPrice * REACHED_MULT) {
       this.reached = true;
 
       if (this.allowedActivatedAt !== null) {
@@ -56,6 +44,14 @@ export class ImpulseTracker {
 
       this.counter++;
       this.reset();
+    }
+
+    // Reset allowed/reached if price goes below prevMa20
+    if ((this.allowed || this.reached) && close < prevMa20) {
+      this.allowed = false;
+      this.reached = false;
+      this.allowedPrice = undefined;
+      this.allowedActivatedAt = null;
     }
   }
 
@@ -71,11 +67,11 @@ export class ImpulseTracker {
 
   getSnapshot(): ImpulseTrackingSnapshot {
     return {
-      floor: this.floor,
+      inPosition: this.inPosition,
       allowed: this.allowed,
       reached: this.reached,
       counter: this.counter,
-      ma99AtFloorSet: this.ma99AtFloorSet,
+      allowedPrice: this.allowedPrice,
       allowedActivatedAt: this.allowedActivatedAt,
       currentElapsedTime: this.currentElapsedTime,
       timings: this.timings,
@@ -84,24 +80,21 @@ export class ImpulseTracker {
     };
   }
 
-  /** Full reset including counter and timings history. */
   resetAll(): void {
-    this.floor = undefined;
+    this.inPosition = false;
     this.allowed = false;
     this.reached = false;
     this.counter = 0;
-    this.ma99AtFloorSet = undefined;
+    this.allowedPrice = undefined;
     this.allowedActivatedAt = null;
     this.timings = [];
     this.averageTime = null;
   }
 
   private reset(): void {
-    this.floor = undefined;
     this.allowed = false;
     this.reached = false;
-    this.ma99AtFloorSet = undefined;
+    this.allowedPrice = undefined;
     this.allowedActivatedAt = null;
-    // timings and averageTime persist across cycles
   }
 }

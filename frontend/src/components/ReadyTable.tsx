@@ -1,5 +1,5 @@
 import { ObserverData } from '../types';
-import { fmtPrice, fmtTime } from '../utils/format';
+import { fmtPrice, fmtTime, getBinanceLink } from '../utils/format';
 
 interface Props { observers: ObserverData[]; }
 
@@ -8,12 +8,16 @@ function Row({ obs, index }: { obs: ObserverData; index: number }) {
   const bg = index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800';
   return (
     <tr className={`${bg} ring-1 ring-inset ring-green-500 hover:bg-gray-700 transition-colors text-xs`}>
-      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">{obs.symbol}</td>
+      <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">
+        <a href={getBinanceLink(obs.symbol)} target="_blank" rel="noopener noreferrer" className="hover:text-yellow-300 underline">
+          {obs.symbol}
+        </a>
+      </td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1s?.close)}</td>
       <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(obs.candle1m?.close)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(obs.ma99)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-purple-400">{t.counter}</td>
-      <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(t.floor)}</td>
+      <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(t.allowedPrice)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-yellow-400">{fmtTime(t.currentElapsedTime)}</td>
       <td className="px-3 py-1.5 text-right font-mono text-gray-300">{fmtTime(t.averageTime)}</td>
     </tr>
@@ -35,7 +39,7 @@ export function ReadyTable({ observers }: Props) {
               <th className="px-3 py-3 text-right">Close 1m</th>
               <th className="px-3 py-3 text-right">MA99</th>
               <th className="px-3 py-3 text-right">Hits</th>
-              <th className="px-3 py-3 text-right">Floor</th>
+              <th className="px-3 py-3 text-right">Allowed Price</th>
               <th className="px-3 py-3 text-right">Elapsed</th>
               <th className="px-3 py-3 text-right">Avg</th>
             </tr>

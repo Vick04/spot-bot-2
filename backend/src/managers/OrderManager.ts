@@ -3,13 +3,14 @@ import { ActiveOrder, CompletedOrder, OrderStatus } from '../types';
 
 const INITIAL_BALANCE = 10_000;
 const FEE = 0.001;           // 0.1% applied on buy (asset) and sell (usdt)
-const TARGET_MULT = 1.005;   // +0.5% sell target
+const TARGET_MULT = 1.003;   // +0.3% sell target
 
 export class OrderManager extends EventEmitter {
   private balance: number = INITIAL_BALANCE;
   private activeOrder: ActiveOrder | null = null;
   private history: CompletedOrder[] = [];
   private enabled: boolean = false;
+  private blockedSymbols: Map<string, number> = new Map(); // symbol -> prevMa20
 
   isEnabled(): boolean {
     return this.enabled;
@@ -25,10 +26,33 @@ export class OrderManager extends EventEmitter {
     return this.activeOrder !== null;
   }
 
+  isSymbolBlocked(symbol: string): boolean {
+    return this.blockedSymbols.has(symbol);
+  }
+
+  blockSymbol(symbol: string, prevMa20: number): void {
+    this.blockedSymbols.set(symbol, prevMa20);
+  }
+
+  unblockSymbol(symbol: string): void {
+    this.blockedSymbols.delete(symbol);
+  }
+
+  canBuySymbol(symbol: string, currentPrice: number): boolean {
+    if (!this.blockedSymbols.has(symbol)) return true;
+    const prevMa20 = this.blockedSymbols.get(symbol)!;
+    if (currentPrice < prevMa20) {
+      this.unblockSymbol(symbol);
+      return true;
+    }
+    return false;
+  }
+
   buy(symbol: string, price: number): void {
     if (!this.enabled) return;
     if (this.activeOrder !== null) return;
     if (this.balance <= 0) return;
+    if (this.isSymbolBlocked(symbol)) return;
 
     const usdtSpent = this.balance;
     const rawQuantity = usdtSpent / price;
@@ -59,6 +83,7 @@ export class OrderManager extends EventEmitter {
     this.balance = INITIAL_BALANCE;
     this.activeOrder = null;
     this.history = [];
+    this.blockedSymbols.clear();
     console.log('[Order] Reset — balance, active order and history cleared');
     this.emit('reset');
   }

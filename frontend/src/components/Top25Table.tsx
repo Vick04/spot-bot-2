@@ -1,5 +1,5 @@
 import { ObserverData, SymbolHits } from '../types';
-import { fmtPrice, fmtTime } from '../utils/format';
+import { fmtPrice, fmtTime, getBinanceLink } from '../utils/format';
 
 interface Entry extends SymbolHits { obs: ObserverData | null; }
 
@@ -24,7 +24,7 @@ export function Top25Table({ entries }: Props) {
             <th className="px-3 py-3 text-right">Hits</th>
             <th className="px-3 py-3 text-right">Close 1s</th>
             <th className="px-3 py-3 text-right">MA99</th>
-            <th className="px-3 py-3 text-right">Floor</th>
+            <th className="px-3 py-3 text-center">In Position</th>
             <th className="px-3 py-3 text-center">Allowed</th>
             <th className="px-3 py-3 text-center">Reached</th>
             <th className="px-3 py-3 text-right">Elapsed</th>
@@ -39,11 +39,17 @@ export function Top25Table({ entries }: Props) {
             return (
               <tr key={entry.symbol} className={`${bg} ${highlight} hover:bg-gray-700 transition-colors text-xs`}>
                 <td className="px-3 py-1.5 text-center text-gray-500 font-mono">{i + 1}</td>
-                <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">{entry.symbol}</td>
+                <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400 whitespace-nowrap">
+                  <a href={getBinanceLink(entry.symbol)} target="_blank" rel="noopener noreferrer" className="hover:text-yellow-300 underline">
+                    {entry.symbol}
+                  </a>
+                </td>
                 <td className="px-3 py-1.5 text-right font-mono text-purple-400">{entry.hits}</td>
                 <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(entry.obs?.candle1s?.close)}</td>
                 <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(entry.obs?.ma99)}</td>
-                <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(t?.floor)}</td>
+                <td className={`px-3 py-1.5 text-center font-mono ${t?.inPosition ? 'text-green-400' : 'text-gray-600'}`}>
+                  {t ? (t.inPosition ? '✓' : '✗') : '—'}
+                </td>
                 <td className={`px-3 py-1.5 text-center font-mono ${t?.allowed ? 'text-green-400' : 'text-gray-600'}`}>
                   {t ? (t.allowed ? '✓' : '✗') : '—'}
                 </td>

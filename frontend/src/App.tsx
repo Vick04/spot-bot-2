@@ -68,7 +68,7 @@ export default function App() {
         {tab === 'all'    && <SymbolTable observers={observerList} />}
         {tab === 'top25'  && <Top25Table entries={top25WithData} />}
         {tab === 'ready'  && <ReadyTable observers={readyList} />}
-        {tab === 'orders' && <OrdersPanel status={orderStatus} history={orderHistory} />}
+        {tab === 'orders' && <OrdersPanel status={orderStatus} history={orderHistory} observers={observers} />}
       </main>
     </div>
   );

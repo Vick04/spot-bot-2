@@ -40,6 +40,10 @@ export class ObserverManager extends EventEmitter {
     return Array.from(this.observers.values()).map(obs => obs.getState());
   }
 
+  getObserver(symbol: string): Observer | null {
+    return this.observers.get(symbol) ?? null;
+  }
+
   getObserverState(symbol: string): ObserverState | null {
     return this.observers.get(symbol)?.getState() ?? null;
   }
