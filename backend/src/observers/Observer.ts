@@ -15,6 +15,8 @@ export class Observer {
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
   private previousCandle1m: Candle | null = null;
+  private prevMA20Cache: number | null = null;
+  private prevBBUpperCache: number | null = null;
 
   constructor(symbol: string) {
     this.symbol = symbol;
@@ -35,8 +37,10 @@ export class Observer {
 
     const ma99 = this.calculateMA99();
     const ma20 = this.calculateMA20();
-    const prevMa20 = this.getPreviousMA20();
-    const prevBBUpper = this.getPreviousBBUpper();
+
+    // Use cached values from previous 1m candle close
+    const prevMa20 = this.prevMA20Cache;
+    const prevBBUpper = this.prevBBUpperCache;
 
     if (ma99 !== null && ma20 !== null && prevMa20 !== null && prevBBUpper !== null) {
       this.impulseTracker.process(candle.close, ma20, ma99, prevBBUpper, prevMa20);
@@ -47,6 +51,17 @@ export class Observer {
     this.previousCandle1m = this.lastCandle1m;
     this.lastCandle1m = candle;
     if (candle.isClosed) {
+      // Cache current MA20 and BBUpper BEFORE adding new candle to queue
+      if (this.queue20.isFull()) {
+        const currentCandles = this.queue20.toArray();
+        const closes = currentCandles.map(c => c.close);
+        const ma20 = closes.reduce((a, b) => a + b, 0) / MA20_PERIOD;
+        const variance = closes.reduce((acc, close) => acc + Math.pow(close - ma20, 2), 0) / BB_PERIOD;
+        const stddev = Math.sqrt(variance);
+        this.prevBBUpperCache = ma20 + BB_STDDEV * stddev;
+        this.prevMA20Cache = ma20;
+      }
+
       this.queue1m.push(candle);
       this.queue20.push(candle);
     }
@@ -70,39 +85,6 @@ export class Observer {
     return sum / MA20_PERIOD;
   }
 
-  getPreviousMA20(): number | null {
-    if (!this.previousCandle1m) return null;
-    const candles = this.queue20.toArray();
-    if (candles.length < MA20_PERIOD) return null;
-    const prevCandles = candles.slice(0, -1);
-    const sum = prevCandles.reduce((acc, c) => acc + c.close, 0);
-    return sum / (MA20_PERIOD - 1);
-  }
-
-  calculateBBUpper(): { ma20: number; upper: number } | null {
-    if (!this.queue20.isFull()) return null;
-    const candles = this.queue20.toArray();
-    const closes = candles.map(c => c.close);
-    const ma20 = closes.reduce((a, b) => a + b, 0) / MA20_PERIOD;
-    const variance = closes.reduce((acc, close) => acc + Math.pow(close - ma20, 2), 0) / BB_PERIOD;
-    const stddev = Math.sqrt(variance);
-    const upper = ma20 + BB_STDDEV * stddev;
-    return { ma20, upper };
-  }
-
-  getPreviousBBUpper(): number | null {
-    if (!this.previousCandle1m) return null;
-    const candles = this.queue20.toArray();
-    if (candles.length < MA20_PERIOD) return null;
-    const prevCandles = candles.slice(0, -1);
-    if (prevCandles.length < MA20_PERIOD - 1) return null;
-    const closes = prevCandles.map(c => c.close);
-    const ma20 = closes.reduce((a, b) => a + b, 0) / (MA20_PERIOD - 1);
-    const variance = closes.reduce((acc, close) => acc + Math.pow(close - ma20, 2), 0) / (BB_PERIOD - 1);
-    const stddev = Math.sqrt(variance);
-    const upper = ma20 + BB_STDDEV * stddev;
-    return upper;
-  }
 
   resetImpulseTracker(): void {
     this.impulseTracker.resetAll();
@@ -113,11 +95,10 @@ export class Observer {
   }
 
   getPrevMa20(): number | null {
-    return this.getPreviousMA20();
+    return this.prevMA20Cache;
   }
 
   getState(): ObserverState {
-    const bb = this.calculateBBUpper();
     return {
       symbol: this.symbol,
       candle1s: this.lastCandle1s ? toCandleData(this.lastCandle1s) : null,

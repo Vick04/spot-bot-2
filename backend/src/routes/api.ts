@@ -11,6 +11,21 @@ export function createRouter(bot: BotManager): Router {
     });
   });
 
+  router.get('/symbols/:symbol/status', (req: Request, res: Response) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const status = bot.symbolManager.getSymbolStatus(symbol);
+    if (!status) {
+      res.status(404).json({ error: `Symbol ${symbol} not found` });
+      return;
+    }
+    res.json({ data: status });
+  });
+
+  router.get('/symbols/status/all', (_req: Request, res: Response) => {
+    const allStatus = bot.symbolManager.getAllSymbolStatus();
+    res.json({ data: allStatus });
+  });
+
   router.get('/observers', (_req: Request, res: Response) => {
     res.json({ data: bot.observerManager.getAllStates() });
   });
