@@ -98,6 +98,21 @@ export class Observer {
     return this.prevMA20Cache;
   }
 
+  getCurrentMA20(): number | null {
+    return this.calculateMA20();
+  }
+
+  getCurrentBBUpper(): number | null {
+    if (!this.queue20.isFull()) return null;
+    const candles = this.queue20.toArray();
+    const closes = candles.map(c => c.close);
+    const ma20 = closes.reduce((a, b) => a + b, 0) / 20;
+    const variance = closes.reduce((acc, close) => acc + Math.pow(close - ma20, 2), 0) / 20;
+    const stddev = Math.sqrt(variance);
+    const upper = ma20 + 2 * stddev;
+    return upper;
+  }
+
   getState(): ObserverState {
     return {
       symbol: this.symbol,

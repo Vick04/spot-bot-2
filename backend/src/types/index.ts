@@ -36,6 +36,8 @@ export interface ActiveOrder {
   targetPrice: number;
   usdtSpent: number;
   openedAt: number;
+  ma20AtBuy: number;
+  bbUpperAtBuy: number;
 }
 
 export interface CompletedOrder {
@@ -50,6 +52,8 @@ export interface CompletedOrder {
   openedAt: number;
   closedAt: number;
   durationMs: number;
+  ma20AtBuy: number;
+  bbUpperAtBuy: number;
 }
 
 export interface OrderStatus {
