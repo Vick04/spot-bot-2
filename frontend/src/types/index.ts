@@ -4,11 +4,11 @@ export interface CandleData {
 }
 
 export interface ImpulseTrackingSnapshot {
-  inPosition: boolean;
+  floor: number | undefined;
   allowed: boolean;
   reached: boolean;
   counter: number;
-  allowedPrice: number | undefined;
+  ma99AtFloorSet: number | undefined;
   allowedActivatedAt: number | null;
   currentElapsedTime: number | null;
   timings: number[];
@@ -46,8 +46,6 @@ export interface CompletedOrder {
   openedAt: number;
   closedAt: number;
   durationMs: number;
-  ma20AtBuy: number;
-  bbUpperAtBuy: number;
 }
 
 export interface OrderStatus {
@@ -63,7 +61,6 @@ export interface SymbolHits {
   hits: number;
 }
 
-export type ObserverState = ObserverData;
 
 export interface ApiResponse<T> {
   data: T;

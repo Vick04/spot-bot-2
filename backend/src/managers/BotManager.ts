@@ -44,23 +44,10 @@ export class BotManager {
       if (!this.orderManager.hasActiveOrder() && state.impulseTracking.readyToBuy) {
         const inTop25 = this.topSymbolsManager.getTop25Symbols().includes(symbol);
         if (inTop25) {
-          const observer = this.observerManager.getObserver(symbol);
-          const prevMa20 = observer?.getPrevMa20() ?? null;
-          const ma20 = observer?.getCurrentMA20() ?? null;
-          const bbUpper = observer?.getCurrentBBUpper() ?? null;
-
-          if (this.orderManager.canBuySymbol(symbol, price) && ma20 !== null && bbUpper !== null) {
-            this.orderManager.buy(symbol, price, ma20, bbUpper);
+          if (this.orderManager.canBuySymbol(symbol, price)) {
+            this.orderManager.buy(symbol, price);
           }
         }
-      }
-    });
-
-    this.orderManager.on('sell', (completed) => {
-      const observer = this.observerManager.getObserver(completed.symbol);
-      const prevMa20 = observer?.getPrevMa20() ?? null;
-      if (prevMa20 !== null) {
-        this.orderManager.blockSymbol(completed.symbol, prevMa20);
       }
     });
 

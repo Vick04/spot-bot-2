@@ -3,7 +3,7 @@ import { ActiveOrder, CompletedOrder, OrderStatus } from '../types';
 
 const INITIAL_BALANCE = 10_000;
 const FEE = 0.001;           // 0.1% applied on buy (asset) and sell (usdt)
-const TARGET_MULT = 1.003;   // +0.3% sell target
+const TARGET_MULT = 1.003;   // +0.3% sell target (changed from +0.5%)
 
 export class OrderManager extends EventEmitter {
   private balance: number = INITIAL_BALANCE;
@@ -48,7 +48,7 @@ export class OrderManager extends EventEmitter {
     return false;
   }
 
-  buy(symbol: string, price: number, ma20: number, bbUpper: number): void {
+  buy(symbol: string, price: number): void {
     if (!this.enabled) return;
     if (this.activeOrder !== null) return;
     if (this.balance <= 0) return;
@@ -60,7 +60,7 @@ export class OrderManager extends EventEmitter {
     const targetPrice = price * TARGET_MULT;
 
     this.balance = 0;
-    this.activeOrder = { symbol, buyPrice: price, quantity, targetPrice, usdtSpent, openedAt: Date.now(), ma20AtBuy: ma20, bbUpperAtBuy: bbUpper };
+    this.activeOrder = { symbol, buyPrice: price, quantity, targetPrice, usdtSpent, openedAt: Date.now() };
 
     console.log(`[Order] BUY  ${symbol} @ ${price} | qty: ${quantity.toFixed(6)} | target: ${targetPrice.toFixed(8)}`);
     this.emit('buy', this.activeOrder);
@@ -122,8 +122,6 @@ export class OrderManager extends EventEmitter {
       openedAt: order.openedAt,
       closedAt,
       durationMs: closedAt - order.openedAt,
-      ma20AtBuy: order.ma20AtBuy,
-      bbUpperAtBuy: order.bbUpperAtBuy,
     };
 
     this.history.push(completed);

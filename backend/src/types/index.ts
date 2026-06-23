@@ -17,11 +17,11 @@ export interface CandleData {
 }
 
 export interface ImpulseTrackingSnapshot {
-  inPosition: boolean;
+  floor: number | undefined;
   allowed: boolean;
   reached: boolean;
   counter: number;
-  allowedPrice: number | undefined;
+  ma99AtFloorSet: number | undefined;
   allowedActivatedAt: number | null;
   currentElapsedTime: number | null;
   timings: number[];
@@ -36,8 +36,6 @@ export interface ActiveOrder {
   targetPrice: number;
   usdtSpent: number;
   openedAt: number;
-  ma20AtBuy: number;
-  bbUpperAtBuy: number;
 }
 
 export interface CompletedOrder {
@@ -52,8 +50,6 @@ export interface CompletedOrder {
   openedAt: number;
   closedAt: number;
   durationMs: number;
-  ma20AtBuy: number;
-  bbUpperAtBuy: number;
 }
 
 export interface OrderStatus {

@@ -1,4 +1,4 @@
-import { OrderStatus, CompletedOrder, ObserverState } from '../types';
+import { OrderStatus, CompletedOrder, ObserverData } from '../types';
 import { fmtPrice, fmtUsdt, fmtDuration, fmtDateTime, getBinanceLink } from '../utils/format';
 
 const TOGGLE_URL = '/api/orders/toggle';
@@ -8,7 +8,7 @@ const BOT_RESET_URL = '/api/bot/reset';
 interface Props {
   status: OrderStatus;
   history: CompletedOrder[];
-  observers: Map<string, ObserverState>;
+  observers: Map<string, ObserverData>;
 }
 
 function ToggleButton({ enabled }: { enabled: boolean }) {
@@ -61,7 +61,7 @@ function ResetBotButton() {
   );
 }
 
-function ActiveOrderCard({ status, observers }: { status: OrderStatus; observers: Map<string, ObserverState> }) {
+function ActiveOrderCard({ status, observers }: { status: OrderStatus; observers: Map<string, ObserverData> }) {
   const o = status.activeOrder;
   const currentPrice = o ? observers.get(o.symbol)?.candle1s?.close : null;
 
@@ -145,8 +145,6 @@ function HistoryTable({ history }: { history: CompletedOrder[] }) {
             <tr className="bg-gray-950 text-gray-400 uppercase text-xs tracking-wider">
               <th className="px-3 py-2 text-left">Symbol</th>
               <th className="px-3 py-2 text-right">Buy</th>
-              <th className="px-3 py-2 text-right">MA20 @Buy</th>
-              <th className="px-3 py-2 text-right">BBUpper @Buy</th>
               <th className="px-3 py-2 text-right">Sell</th>
               <th className="px-3 py-2 text-right">Spent</th>
               <th className="px-3 py-2 text-right">Received</th>
@@ -159,7 +157,7 @@ function HistoryTable({ history }: { history: CompletedOrder[] }) {
           <tbody>
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-gray-500 text-sm">
+                <td colSpan={9} className="px-4 py-8 text-center text-gray-500 text-sm">
                   No completed trades yet.
                 </td>
               </tr>
@@ -175,8 +173,6 @@ function HistoryTable({ history }: { history: CompletedOrder[] }) {
                       </a>
                     </td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(o.buyPrice)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(o.ma20AtBuy)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-purple-400">{fmtPrice(o.bbUpperAtBuy)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(o.sellPrice)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtUsdt(o.usdtSpent)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtUsdt(o.usdtReceived)}</td>

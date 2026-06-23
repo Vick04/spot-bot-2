@@ -15,8 +15,6 @@ export class Observer {
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
   private previousCandle1m: Candle | null = null;
-  private prevMA20Cache: number | null = null;
-  private prevBBUpperCache: number | null = null;
 
   constructor(symbol: string) {
     this.symbol = symbol;
@@ -38,12 +36,8 @@ export class Observer {
     const ma99 = this.calculateMA99();
     const ma20 = this.calculateMA20();
 
-    // Use cached values from previous 1m candle close
-    const prevMa20 = this.prevMA20Cache;
-    const prevBBUpper = this.prevBBUpperCache;
-
-    if (ma99 !== null && ma20 !== null && prevMa20 !== null && prevBBUpper !== null) {
-      this.impulseTracker.process(candle.close, ma20, ma99, prevBBUpper, prevMa20);
+    if (ma99 !== null && ma20 !== null) {
+      this.impulseTracker.process(candle.close, ma20, ma99);
     }
   }
 
@@ -51,17 +45,6 @@ export class Observer {
     this.previousCandle1m = this.lastCandle1m;
     this.lastCandle1m = candle;
     if (candle.isClosed) {
-      // Cache current MA20 and BBUpper BEFORE adding new candle to queue
-      if (this.queue20.isFull()) {
-        const currentCandles = this.queue20.toArray();
-        const closes = currentCandles.map(c => c.close);
-        const ma20 = closes.reduce((a, b) => a + b, 0) / MA20_PERIOD;
-        const variance = closes.reduce((acc, close) => acc + Math.pow(close - ma20, 2), 0) / BB_PERIOD;
-        const stddev = Math.sqrt(variance);
-        this.prevBBUpperCache = ma20 + BB_STDDEV * stddev;
-        this.prevMA20Cache = ma20;
-      }
-
       this.queue1m.push(candle);
       this.queue20.push(candle);
     }
@@ -94,24 +77,6 @@ export class Observer {
     return this.queue1m.toArray();
   }
 
-  getPrevMa20(): number | null {
-    return this.prevMA20Cache;
-  }
-
-  getCurrentMA20(): number | null {
-    return this.calculateMA20();
-  }
-
-  getCurrentBBUpper(): number | null {
-    if (!this.queue20.isFull()) return null;
-    const candles = this.queue20.toArray();
-    const closes = candles.map(c => c.close);
-    const ma20 = closes.reduce((a, b) => a + b, 0) / 20;
-    const variance = closes.reduce((acc, close) => acc + Math.pow(close - ma20, 2), 0) / 20;
-    const stddev = Math.sqrt(variance);
-    const upper = ma20 + 2 * stddev;
-    return upper;
-  }
 
   getState(): ObserverState {
     return {
