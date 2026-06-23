@@ -38,11 +38,11 @@ export class OrderManager extends EventEmitter {
     this.blockedSymbols.delete(symbol);
   }
 
-  canBuySymbol(symbol: string, currentPrice: number, ma20: number): boolean {
+  canBuySymbol(symbol: string, ma20: number, ma99: number): boolean {
     if (!this.blockedSymbols.has(symbol)) return true;
 
-    // Unblock if price < ma20
-    if (currentPrice < ma20) {
+    // Unblock if ma20 < ma99 (safer re-entry point, after downtrend)
+    if (ma20 < ma99) {
       this.unblockSymbol(symbol);
       return true;
     }

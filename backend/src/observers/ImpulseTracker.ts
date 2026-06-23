@@ -14,9 +14,9 @@ export class ImpulseTracker {
   private timings: number[] = [];
   private averageTime: number | null = null;
 
-  process(close: number, ma20: number, ma99: number): void {
-    // Step 1: set floor ONCE when price > ma20
-    if (this.floor === undefined && close > ma20) {
+  process(close: number, ma20: number, ma99: number, hasCrossed: boolean): void {
+    // Step 1: set floor ONCE when price > ma20 AND ma20 > ma99 (after crossing)
+    if (this.floor === undefined && close > ma20 && hasCrossed) {
       this.floor = close;
       this.ma99AtFloorSet = ma99;
       this.allowed = false;

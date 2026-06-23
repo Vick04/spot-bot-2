@@ -15,6 +15,7 @@ export class Observer {
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
   private previousCandle1m: Candle | null = null;
+  private ma20PreviouslyLessThanMa99: boolean = false;
 
   constructor(symbol: string) {
     this.symbol = symbol;
@@ -38,8 +39,10 @@ export class Observer {
     const ma99 = this.calculateMA99();
 
     if (ma99 !== null && ma20 !== null) {
+      // Check if ma20 crossed above ma99
+      const hasCrossed = this.ma20PreviouslyLessThanMa99 && ma20 > ma99;
       // Use price from 1s candle, ma20 from 1m candles
-      this.impulseTracker.process(candle.close, ma20, ma99);
+      this.impulseTracker.process(candle.close, ma20, ma99, hasCrossed);
     }
   }
 
@@ -47,6 +50,14 @@ export class Observer {
     this.previousCandle1m = this.lastCandle1m;
     this.lastCandle1m = candle;
     if (candle.isClosed) {
+      // Track if ma20 < ma99 for detecting crosses
+      const ma20 = this.calculateMA20();
+      const ma99 = this.calculateMA99();
+
+      if (ma20 !== null && ma99 !== null) {
+        this.ma20PreviouslyLessThanMa99 = ma20 < ma99;
+      }
+
       this.queue1m.push(candle);
       this.queue20.push(candle);
     }
@@ -73,6 +84,16 @@ export class Observer {
 
   resetImpulseTracker(): void {
     this.impulseTracker.resetAll();
+  }
+
+  hasMa20CrossedAboveMa99(): boolean {
+    const ma20 = this.calculateMA20();
+    const ma99 = this.calculateMA99();
+
+    if (ma20 === null || ma99 === null) return false;
+
+    // Return true if ma20 was < ma99 and now is > ma99
+    return this.ma20PreviouslyLessThanMa99 && ma20 > ma99;
   }
 
   getBuffer1m(): Candle[] {

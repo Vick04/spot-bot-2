@@ -46,8 +46,9 @@ export class BotManager {
         if (inTop25) {
           const observer = this.observerManager.getObserver(symbol);
           const ma20 = observer?.calculateMA20() ?? null;
+          const ma99 = observer?.calculateMA99() ?? null;
 
-          if (ma20 !== null && this.orderManager.canBuySymbol(symbol, price, ma20)) {
+          if (ma20 !== null && ma99 !== null && this.orderManager.canBuySymbol(symbol, ma20, ma99)) {
             this.orderManager.buy(symbol, price);
           }
         }
@@ -56,13 +57,12 @@ export class BotManager {
 
     this.orderManager.on('sell', (completed) => {
       const observer = this.observerManager.getObserver(completed.symbol);
-      const ma20 = observer?.calculateMA20() ?? null;
 
-      if (ma20 !== null) {
-        // Block symbol until price < ma20
-        this.orderManager.blockSymbol(completed.symbol, ma20);
+      if (observer) {
+        // Block symbol - will unblock when ma20 < ma99
+        this.orderManager.blockSymbol(completed.symbol, 0);
         // Reset impulse tracker so floor becomes undefined again
-        observer?.resetImpulseTracker();
+        observer.resetImpulseTracker();
       }
     });
 
