@@ -10,7 +10,7 @@ export class OrderManager extends EventEmitter {
   private activeOrder: ActiveOrder | null = null;
   private history: CompletedOrder[] = [];
   private enabled: boolean = false;
-  private blockedSymbols: Map<string, number> = new Map(); // symbol -> prevMa20
+  private blockedSymbols: Map<string, number> = new Map(); // symbol -> ma20 threshold
 
   isEnabled(): boolean {
     return this.enabled;
@@ -38,10 +38,11 @@ export class OrderManager extends EventEmitter {
     this.blockedSymbols.delete(symbol);
   }
 
-  canBuySymbol(symbol: string, currentPrice: number): boolean {
+  canBuySymbol(symbol: string, currentPrice: number, ma20: number): boolean {
     if (!this.blockedSymbols.has(symbol)) return true;
-    const prevMa20 = this.blockedSymbols.get(symbol)!;
-    if (currentPrice < prevMa20) {
+
+    // Unblock if price < ma20
+    if (currentPrice < ma20) {
       this.unblockSymbol(symbol);
       return true;
     }

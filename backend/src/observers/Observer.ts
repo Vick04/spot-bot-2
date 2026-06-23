@@ -33,10 +33,12 @@ export class Observer {
   updateCandle1s(candle: Candle): void {
     this.lastCandle1s = candle;
 
-    const ma99 = this.calculateMA99();
+    // Get MA20 from last closed 1m candle
     const ma20 = this.calculateMA20();
+    const ma99 = this.calculateMA99();
 
     if (ma99 !== null && ma20 !== null) {
+      // Use price from 1s candle, ma20 from 1m candles
       this.impulseTracker.process(candle.close, ma20, ma99);
     }
   }

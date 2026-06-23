@@ -44,10 +44,25 @@ export class BotManager {
       if (!this.orderManager.hasActiveOrder() && state.impulseTracking.readyToBuy) {
         const inTop25 = this.topSymbolsManager.getTop25Symbols().includes(symbol);
         if (inTop25) {
-          if (this.orderManager.canBuySymbol(symbol, price)) {
+          const observer = this.observerManager.getObserver(symbol);
+          const ma20 = observer?.calculateMA20() ?? null;
+
+          if (ma20 !== null && this.orderManager.canBuySymbol(symbol, price, ma20)) {
             this.orderManager.buy(symbol, price);
           }
         }
+      }
+    });
+
+    this.orderManager.on('sell', (completed) => {
+      const observer = this.observerManager.getObserver(completed.symbol);
+      const ma20 = observer?.calculateMA20() ?? null;
+
+      if (ma20 !== null) {
+        // Block symbol until price < ma20
+        this.orderManager.blockSymbol(completed.symbol, ma20);
+        // Reset impulse tracker so floor becomes undefined again
+        observer?.resetImpulseTracker();
       }
     });
 

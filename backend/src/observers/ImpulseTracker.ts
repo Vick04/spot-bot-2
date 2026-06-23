@@ -15,21 +15,20 @@ export class ImpulseTracker {
   private averageTime: number | null = null;
 
   process(close: number, ma20: number, ma99: number): void {
-    // Step 1: set floor — price > ma20
+    // Step 1: set floor ONCE when price > ma20
     if (this.floor === undefined && close > ma20) {
       this.floor = close;
       this.ma99AtFloorSet = ma99;
       this.allowed = false;
       this.reached = false;
-      return; // Return early since floor just set, no need to process steps 3-4 yet
+      return;
     }
 
-    // Step 2: update floor to higher high
-    if (this.floor !== undefined && close > this.floor) {
+    // Step 2: update floor to lower low (only downwards, finding the minimum)
+    if (this.floor !== undefined && close < this.floor) {
       this.floor = close;
       this.allowed = false;
       this.reached = false;
-      // Continue processing steps 3-4 since price moved higher
     }
 
     // Step 3: allow — price recovers +0.4% from floor
