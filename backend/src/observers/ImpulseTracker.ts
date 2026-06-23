@@ -16,32 +16,30 @@ export class ImpulseTracker {
 
   process(close: number, ma20: number, ma99: number): void {
     // Step 1: set floor — price > ma20
-    if (this.floor === undefined) {
-      if (close > ma20) {
-        this.floor = close;
-        this.ma99AtFloorSet = ma99;
-        this.allowed = false;
-        this.reached = false;
-      }
-      return;
+    if (this.floor === undefined && close > ma20) {
+      this.floor = close;
+      this.ma99AtFloorSet = ma99;
+      this.allowed = false;
+      this.reached = false;
+      return; // Return early since floor just set, no need to process steps 3-4 yet
     }
 
     // Step 2: update floor to higher high
-    if (close > this.floor) {
+    if (this.floor !== undefined && close > this.floor) {
       this.floor = close;
       this.allowed = false;
       this.reached = false;
-      return;
+      // Continue processing steps 3-4 since price moved higher
     }
 
     // Step 3: allow — price recovers +0.4% from floor
-    if (!this.allowed && close >= this.floor * ALLOWED_THRESHOLD) {
+    if (this.floor !== undefined && !this.allowed && close >= this.floor * ALLOWED_THRESHOLD) {
       this.allowed = true;
       this.allowedActivatedAt = Date.now();
     }
 
     // Step 4: reached — price hits +0.7% from floor
-    if (!this.reached && close >= this.floor * REACHED_THRESHOLD) {
+    if (this.floor !== undefined && !this.reached && close >= this.floor * REACHED_THRESHOLD) {
       this.reached = true;
 
       if (this.allowedActivatedAt !== null) {
