@@ -68,3 +68,32 @@ export interface ObserverState {
   isReady: boolean;
   impulseTracking: ImpulseTrackingSnapshot;
 }
+
+// ---------------------------------------------------------------------------
+// Bollinger module (isolated 1h observer — does not affect the bot above)
+// ---------------------------------------------------------------------------
+
+/** A 1h candle enriched with its indicator values at that point in time. */
+export interface BollingerCandle {
+  symbol: string;
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  isClosed: boolean;
+  ma20: number | null;
+  ma99: number | null;
+  bbMiddle: number | null;
+  bbUpper: number | null;
+  bbLower: number | null;
+  bbWidth: number | null;
+}
+
+/** Full state of one Bollinger observer: closed history + live open candle. */
+export interface BollingerObserverState {
+  symbol: string;
+  history: BollingerCandle[];       // closed 1h candles with indicators
+  current: BollingerCandle | null;  // currently open 1h candle, recomputed live
+  isReady: boolean;
+}

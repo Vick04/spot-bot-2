@@ -2,6 +2,7 @@ import { SymbolManager } from '../services/symbolManager';
 import { ObserverManager } from './ObserverManager';
 import { TopSymbolsManager } from './TopSymbolsManager';
 import { OrderManager } from './OrderManager';
+import { BollingerManager } from './BollingerManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
 import { fetchHistoricalCandles } from '../services/historicalCandles';
 import { ObserverState } from '../types';
@@ -11,6 +12,7 @@ export class BotManager {
   readonly observerManager: ObserverManager;
   readonly topSymbolsManager: TopSymbolsManager;
   readonly orderManager: OrderManager;
+  readonly bollingerManager: BollingerManager;
   private ws: BinanceWebSocket | null = null;
 
   constructor() {
@@ -18,6 +20,7 @@ export class BotManager {
     this.observerManager = new ObserverManager();
     this.topSymbolsManager = new TopSymbolsManager();
     this.orderManager = new OrderManager();
+    this.bollingerManager = new BollingerManager();
   }
 
   async start(): Promise<void> {
@@ -69,6 +72,9 @@ export class BotManager {
     this.ws = new BinanceWebSocket(symbols);
     this.ws.on('candle', candle => this.observerManager.updateCandle(candle));
     this.ws.connect();
+
+    // Independent Bollinger module — runs in parallel, shares no state with the bot
+    await this.bollingerManager.start();
   }
 
   resetBot(): void {
@@ -97,6 +103,7 @@ export class BotManager {
 
   stop(): void {
     this.ws?.destroy();
+    this.bollingerManager.stop();
     this.symbolManager.destroy();
   }
 

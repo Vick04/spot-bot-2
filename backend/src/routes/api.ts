@@ -48,6 +48,10 @@ export function createRouter(bot: BotManager): Router {
     res.json({ data: bot.getReadySymbols() });
   });
 
+  router.get('/bollinger', (_req: Request, res: Response) => {
+    res.json({ data: bot.bollingerManager.getSnapshot() });
+  });
+
   router.get('/orders/status', (_req: Request, res: Response) => {
     res.json({ data: bot.orderManager.getStatus() });
   });

@@ -3,6 +3,7 @@ import { Server as SocketIO } from 'socket.io';
 import { ObserverManager } from '../managers/ObserverManager';
 import { TopSymbolsManager } from '../managers/TopSymbolsManager';
 import { OrderManager } from '../managers/OrderManager';
+import { BollingerManager } from '../managers/BollingerManager';
 import { ActiveOrder, CompletedOrder } from '../types';
 
 export function createSocketServer(
@@ -10,6 +11,7 @@ export function createSocketServer(
   observerManager: ObserverManager,
   topSymbolsManager: TopSymbolsManager,
   orderManager: OrderManager,
+  bollingerManager: BollingerManager,
 ): void {
   const io = new SocketIO(httpServer, { cors: { origin: '*' } });
 
@@ -22,6 +24,8 @@ export function createSocketServer(
       orderStatus: orderManager.getStatus(),
       orderHistory: orderManager.getHistory(),
     });
+
+    socket.emit('bollinger:snapshot', bollingerManager.getSnapshot());
 
     socket.on('disconnect', () => {
       console.log(`[WS] Client disconnected: ${socket.id}`);
@@ -58,5 +62,14 @@ export function createSocketServer(
     io.emit('order:status', orderManager.getStatus());
     io.emit('order:sell', completed);
     io.emit('order:history', orderManager.getHistory());
+  });
+
+  // Bollinger module — isolated event channel
+  bollingerManager.on('current', (data) => {
+    io.emit('bollinger:current', data);
+  });
+
+  bollingerManager.on('closed', (data) => {
+    io.emit('bollinger:closed', data);
   });
 }

@@ -65,3 +65,30 @@ export interface SymbolHits {
 export interface ApiResponse<T> {
   data: T;
 }
+
+// ---------------------------------------------------------------------------
+// Bollinger module
+// ---------------------------------------------------------------------------
+
+export interface BollingerCandle {
+  symbol: string;
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  isClosed: boolean;
+  ma20: number | null;
+  ma99: number | null;
+  bbMiddle: number | null;
+  bbUpper: number | null;
+  bbLower: number | null;
+  bbWidth: number | null;
+}
+
+export interface BollingerObserverState {
+  symbol: string;
+  history: BollingerCandle[];
+  current: BollingerCandle | null;
+  isReady: boolean;
+}
