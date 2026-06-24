@@ -97,3 +97,65 @@ export interface BollingerObserverState {
   current: BollingerCandle | null;  // currently open 1h candle, recomputed live
   isReady: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Squeeze→breakout detector (observe-only, 1m timeframe)
+// ---------------------------------------------------------------------------
+
+export type SignalState = 'OPEN' | 'WIN' | 'FAIL' | 'FLAT';
+
+/** One detected squeeze→breakout signal, self-labeled with its outcome. */
+export interface BreakoutSignal {
+  id: string;
+  symbol: string;
+  state: SignalState;
+  // entry context
+  entryTime: number;
+  entryPrice: number;
+  squeezeBbw: number;       // lowest bbWidth in the squeeze before the break
+  entryBbw: number;
+  bbUpperAtEntry: number;
+  ma20: number;
+  ma99: number;
+  ma20Slope: number;        // ma20 - ma20[-slopeLookback]
+  position: number;         // (close-mid)/(upper-mid) at entry; >0 = upper half
+  target: number;           // entryPrice * (1 + targetPct)
+  // evolution
+  peakBbw: number;
+  minutesToPeak: number;
+  mfePct: number;           // max favorable excursion %
+  maePct: number;           // max adverse excursion %
+  // resolution
+  exitTime: number | null;
+  exitPrice: number | null;
+  outcomePct: number | null;
+  barsHeld: number;
+}
+
+export interface DetectorStats {
+  total: number;
+  wins: number;
+  fails: number;
+  flats: number;
+  open: number;
+  winRate: number;          // wins / resolved
+  avgMfePct: number;
+  avgMaePct: number;
+  avgMinutesToPeak: number;
+}
+
+/** Per-symbol signal tally for the detector dashboard table. */
+export interface SymbolSignalCounts {
+  symbol: string;
+  open: number;
+  win: number;
+  fail: number;
+  flat: number;
+  total: number;
+}
+
+export interface DetectorSnapshot {
+  perSymbol: SymbolSignalCounts[];
+  open: BreakoutSignal[];
+  stats: DetectorStats;
+}

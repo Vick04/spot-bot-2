@@ -73,8 +73,8 @@ export class BotManager {
     this.ws.on('candle', candle => this.observerManager.updateCandle(candle));
     this.ws.connect();
 
-    // Independent Bollinger module — runs in parallel, shares no state with the bot
-    await this.bollingerManager.start();
+    // Independent Bollinger module — 1m squeeze→breakout detector for ALL symbols
+    await this.bollingerManager.start(symbols);
   }
 
   resetBot(): void {

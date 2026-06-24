@@ -92,3 +92,48 @@ export interface BollingerObserverState {
   current: BollingerCandle | null;
   isReady: boolean;
 }
+
+// Squeeze→breakout detector (1m, all symbols)
+export type SignalState = 'OPEN' | 'WIN' | 'FAIL' | 'FLAT';
+
+export interface BreakoutSignal {
+  id: string;
+  symbol: string;
+  state: SignalState;
+  entryTime: number;
+  entryPrice: number;
+  squeezeBbw: number;
+  position: number;
+  target: number;
+  mfePct: number;
+  maePct: number;
+  outcomePct: number | null;
+  barsHeld: number;
+}
+
+export interface SymbolSignalCounts {
+  symbol: string;
+  open: number;
+  win: number;
+  fail: number;
+  flat: number;
+  total: number;
+}
+
+export interface DetectorStats {
+  total: number;
+  wins: number;
+  fails: number;
+  flats: number;
+  open: number;
+  winRate: number;
+  avgMfePct: number;
+  avgMaePct: number;
+  avgMinutesToPeak: number;
+}
+
+export interface DetectorSnapshot {
+  perSymbol: SymbolSignalCounts[];
+  open: BreakoutSignal[];
+  stats: DetectorStats;
+}

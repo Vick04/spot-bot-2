@@ -25,7 +25,7 @@ export function createSocketServer(
       orderHistory: orderManager.getHistory(),
     });
 
-    socket.emit('bollinger:snapshot', bollingerManager.getSnapshot());
+    socket.emit('detector:snapshot', bollingerManager.getSignals());
 
     socket.on('disconnect', () => {
       console.log(`[WS] Client disconnected: ${socket.id}`);
@@ -64,12 +64,12 @@ export function createSocketServer(
     io.emit('order:history', orderManager.getHistory());
   });
 
-  // Bollinger module — isolated event channel
-  bollingerManager.on('current', (data) => {
-    io.emit('bollinger:current', data);
+  // Bollinger 1m detector — isolated event channel
+  bollingerManager.on('signal', () => {
+    io.emit('detector:snapshot', bollingerManager.getSignals());
   });
 
-  bollingerManager.on('closed', (data) => {
-    io.emit('bollinger:closed', data);
+  bollingerManager.on('resolved', () => {
+    io.emit('detector:snapshot', bollingerManager.getSignals());
   });
 }

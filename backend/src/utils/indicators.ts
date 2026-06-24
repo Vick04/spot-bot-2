@@ -11,7 +11,7 @@ export interface BollingerBands {
   middle: number;
   upper: number;
   lower: number;
-  width: number; // upper - lower
+  width: number;        // (upper - lower) / middle * 100 — standard Bollinger BandWidth %
 }
 
 /** Simple Moving Average over the last `period` closes. */
@@ -30,5 +30,7 @@ export function bollinger(closes: number[], period: number, mult: number): Bolli
   const stddev = Math.sqrt(variance);
   const upper = mean + mult * stddev;
   const lower = mean - mult * stddev;
-  return { middle: mean, upper, lower, width: upper - lower };
+  // BandWidth normalized by the middle band (MA20) — Bollinger's standard formula
+  const width = mean !== 0 ? ((upper - lower) / mean) * 100 : 0;
+  return { middle: mean, upper, lower, width };
 }

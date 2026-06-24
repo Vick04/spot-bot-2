@@ -53,7 +53,7 @@ export function BollingerHistoryTable({ history }: Props) {
                     <td className="px-3 py-1.5 text-right font-mono text-blue-400">{fmtPrice(c.ma99)}</td>
                     <td className="px-3 py-1.5 text-right font-mono text-purple-400">{fmtPrice(c.bbUpper)}</td>
                     <td className="px-3 py-1.5 text-right font-mono text-purple-400">{fmtPrice(c.bbLower)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-pink-400">{fmtPrice(c.bbWidth)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-pink-400">{c.bbWidth != null ? `${c.bbWidth.toFixed(3)}%` : '—'}</td>
                   </tr>
                 );
               })

@@ -36,13 +36,19 @@ function parseRow(row: BinanceKlineRow): RawCandle {
 }
 
 /**
- * Fetches closed 1h candles for a symbol. We request more than we display so
- * the oldest shown candle still has a valid MA99 (which needs 99 prior closes).
- * The last row from Binance is the currently open candle and is dropped.
+ * Fetches closed candles for a symbol at the given interval. We request more
+ * than we display so the oldest shown candle still has a valid MA99 (which
+ * needs 99 prior closes). The last row from Binance is the currently open
+ * candle and is dropped.
  */
-export async function fetchBollinger1hHistory(symbol: string, limit = 300): Promise<RawCandle[]> {
-  const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=1h&limit=${limit}`;
+export async function fetchBollingerHistory(symbol: string, interval = '1h', limit = 300): Promise<RawCandle[]> {
+  const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const rows = await get<BinanceKlineRow[]>(url);
   // Drop the last row (open/unconfirmed candle)
   return rows.slice(0, -1).map(parseRow);
+}
+
+/** Back-compat alias for the 1h history fetch. */
+export function fetchBollinger1hHistory(symbol: string, limit = 300): Promise<RawCandle[]> {
+  return fetchBollingerHistory(symbol, '1h', limit);
 }

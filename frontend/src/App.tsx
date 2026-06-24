@@ -10,8 +10,8 @@ type Page = 'bot' | 'bollinger';
 type Tab = 'all' | 'top25' | 'ready' | 'orders';
 
 const PAGES: { id: Page; label: string }[] = [
-  { id: 'bot',       label: 'Trading Bot'   },
-  { id: 'bollinger', label: 'Bollinger Lab' },
+  { id: 'bot',       label: 'Trading Bot' },
+  { id: 'bollinger', label: 'Detector'    },
 ];
 
 const TABS: { id: Tab; label: string }[] = [

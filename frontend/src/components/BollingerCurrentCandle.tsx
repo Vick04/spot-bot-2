@@ -1,10 +1,21 @@
+import { useEffect, useState } from 'react';
 import { BollingerCandle } from '../types';
-import { fmtPrice, fmtDateTime, getBinanceLink } from '../utils/format';
+import { fmtPrice, fmtDateTime, fmtTime, getBinanceLink } from '../utils/format';
 
 interface Props {
   symbol: string;
   current: BollingerCandle | null;
   isReady: boolean;
+}
+
+/** Ticking clock so elapsed time advances every second between socket ticks. */
+function useNow(intervalMs = 1000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
 }
 
 function Field({ label, value, color = '' }: { label: string; value: string; color?: string }) {
@@ -17,8 +28,10 @@ function Field({ label, value, color = '' }: { label: string; value: string; col
 }
 
 export function BollingerCurrentCandle({ symbol, current, isReady }: Props) {
+  const now = useNow();
   const changePct = current ? ((current.close - current.open) / current.open) * 100 : 0;
   const changeColor = changePct >= 0 ? 'text-green-400' : 'text-red-400';
+  const elapsed = current ? now - current.openTime : null;
 
   return (
     <div className="rounded-lg border border-yellow-500/30 bg-gray-800 p-4 space-y-3">
@@ -41,6 +54,7 @@ export function BollingerCurrentCandle({ symbol, current, isReady }: Props) {
       {current ? (
         <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-xs">
           <Field label="Open time" value={fmtDateTime(current.openTime)} color="text-gray-300" />
+          <Field label="Elapsed" value={fmtTime(elapsed)} color="text-cyan-400" />
           <Field label="Change" value={`${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`} color={changeColor} />
           <Field label="Open" value={fmtPrice(current.open)} color="text-gray-300" />
           <Field label="Close" value={fmtPrice(current.close)} color="text-white font-semibold" />
@@ -54,7 +68,7 @@ export function BollingerCurrentCandle({ symbol, current, isReady }: Props) {
           <Field label="BB Upper" value={fmtPrice(current.bbUpper)} color="text-purple-400" />
           <Field label="BB Middle" value={fmtPrice(current.bbMiddle)} color="text-gray-300" />
           <Field label="BB Lower" value={fmtPrice(current.bbLower)} color="text-purple-400" />
-          <Field label="BB Width" value={fmtPrice(current.bbWidth)} color="text-pink-400" />
+          <Field label="BB Width" value={current.bbWidth != null ? `${current.bbWidth.toFixed(3)}%` : '—'} color="text-pink-400" />
         </div>
       ) : (
         <div className="text-xs text-gray-500 text-center py-4">Waiting for live candle…</div>

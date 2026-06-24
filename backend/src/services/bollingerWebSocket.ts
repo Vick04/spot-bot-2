@@ -33,18 +33,20 @@ export interface BollingerTick {
 export class BollingerWebSocket extends EventEmitter {
   private ws: WebSocket | null = null;
   private symbols: string[];
+  private interval: string;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isDestroyed = false;
 
-  constructor(symbols: string[]) {
+  constructor(symbols: string[], interval = '1h') {
     super();
     this.symbols = symbols;
+    this.interval = interval;
   }
 
   connect(): void {
-    const streams = this.symbols.map(s => `${s.toLowerCase()}@kline_1h`);
+    const streams = this.symbols.map(s => `${s.toLowerCase()}@kline_${this.interval}`);
     const url = `${BINANCE_WS_BASE}/stream?streams=${streams.join('/')}`;
-    console.log(`[Bollinger WS] Connecting to ${streams.length} 1h streams`);
+    console.log(`[Bollinger WS] Connecting to ${streams.length} ${this.interval} streams`);
 
     this.ws = new WebSocket(url);
 
