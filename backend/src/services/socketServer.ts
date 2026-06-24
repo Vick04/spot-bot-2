@@ -72,4 +72,8 @@ export function createSocketServer(
   bollingerManager.on('resolved', () => {
     io.emit('detector:snapshot', bollingerManager.getSignals());
   });
+
+  // Periodic refresh so the per-symbol blocked state stays live (it clears on a
+  // squeeze candle, which emits no signal event).
+  setInterval(() => io.emit('detector:snapshot', bollingerManager.getSignals()), 4000);
 }

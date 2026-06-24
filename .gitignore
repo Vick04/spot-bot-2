@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env
 *.log
+
+# runtime detector signal log
+backend/data/bollinger-signals.json

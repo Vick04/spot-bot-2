@@ -54,7 +54,10 @@ export class BollingerManager extends EventEmitter {
     this.detectors.forEach(d => { const o = d.getOpen(); if (o) open.push(o); });
 
     const counts = new Map<string, SymbolSignalCounts>();
-    this.symbols.forEach(s => counts.set(s, { symbol: s, open: 0, win: 0, fail: 0, flat: 0, total: 0 }));
+    this.symbols.forEach(s => counts.set(s, {
+      symbol: s, open: 0, win: 0, fail: 0, flat: 0, total: 0,
+      blocked: this.detectors.get(s)?.isBlocked() ?? false,
+    }));
     open.forEach(o => { const c = counts.get(o.symbol); if (c) { c.open++; c.total++; } });
     this.signals.forEach(s => {
       const c = counts.get(s.symbol);

@@ -118,6 +118,7 @@ export interface SymbolSignalCounts {
   fail: number;
   flat: number;
   total: number;
+  blocked: boolean;
 }
 
 export interface DetectorStats {

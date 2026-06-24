@@ -54,6 +54,7 @@ export function BollingerPage() {
             <thead className="sticky top-0">
               <tr className="bg-gray-950 text-gray-400 uppercase text-xs tracking-wider">
                 <th className="px-3 py-2 text-left">Symbol</th>
+                <th className="px-3 py-2 text-center">Buy</th>
                 <th className="px-3 py-2 text-right">Open</th>
                 <th className="px-3 py-2 text-right">Win</th>
                 <th className="px-3 py-2 text-right">Fail</th>
@@ -64,7 +65,7 @@ export function BollingerPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500 text-sm">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500 text-sm">
                     No signals yet — detector is warming up and watching.
                   </td>
                 </tr>
@@ -72,6 +73,11 @@ export function BollingerPage() {
                 rows.map((s, i) => {
                   const bg = i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800';
                   const highlight = s.open > 0 ? 'ring-1 ring-inset ring-yellow-500/50' : '';
+                  const buy = s.open > 0
+                    ? { label: 'holding', cls: 'text-yellow-400' }
+                    : s.blocked
+                      ? { label: '🔒 blocked', cls: 'text-red-400' }
+                      : { label: 'ready', cls: 'text-green-400' };
                   return (
                     <tr key={s.symbol} className={`${bg} ${highlight} hover:bg-gray-700 transition-colors text-xs`}>
                       <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400">
@@ -79,6 +85,7 @@ export function BollingerPage() {
                           {s.symbol}
                         </a>
                       </td>
+                      <td className={`px-3 py-1.5 text-center font-mono ${buy.cls}`}>{buy.label}</td>
                       <td className={`px-3 py-1.5 text-right font-mono ${s.open > 0 ? 'text-yellow-400 font-semibold' : 'text-gray-600'}`}>{s.open || '·'}</td>
                       <td className={`px-3 py-1.5 text-right font-mono ${s.win > 0 ? 'text-green-400' : 'text-gray-600'}`}>{s.win || '·'}</td>
                       <td className={`px-3 py-1.5 text-right font-mono ${s.fail > 0 ? 'text-red-400' : 'text-gray-600'}`}>{s.fail || '·'}</td>

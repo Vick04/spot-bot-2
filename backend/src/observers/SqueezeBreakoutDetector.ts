@@ -24,7 +24,7 @@ export interface DetectorParams {
 
 export const DEFAULT_PARAMS: DetectorParams = {
   squeezeMaxBbw: 0.5,
-  squeezeLookback: 5,
+  squeezeLookback: 1,
   trendSlopeLookback: 3,
   minPosition: 0.45,
   targetPct: 0.003,
@@ -45,6 +45,7 @@ export class SqueezeBreakoutDetector {
   private resolved: BreakoutSignal[] = [];
   private hourBucket = -1;     // current 1h bucket (openTime / HOUR_MS)
   private opensThisHour = 0;
+  private blockedUntilSqueeze = false; // after a WIN, no OPEN until a fresh squeeze appears
 
   constructor(symbol: string, params: DetectorParams = DEFAULT_PARAMS) {
     this.symbol = symbol;
@@ -53,6 +54,7 @@ export class SqueezeBreakoutDetector {
 
   getOpen(): BreakoutSignal | null { return this.open; }
   getResolved(): BreakoutSignal[] { return this.resolved; }
+  isBlocked(): boolean { return this.blockedUntilSqueeze; }
 
   /** Feed the latest CLOSED 1m candle (already carries indicators). */
   onClosedCandle(c: BollingerCandle): BreakoutSignal[] {
@@ -67,11 +69,16 @@ export class SqueezeBreakoutDetector {
     const bucket = Math.floor(c.openTime / HOUR_MS);
     if (bucket !== this.hourBucket) { this.hourBucket = bucket; this.opensThisHour = 0; }
 
+    // a fresh squeeze candle clears the post-WIN block
+    if (c.bbWidth != null && c.bbWidth < this.p.squeezeMaxBbw) this.blockedUntilSqueeze = false;
+
     if (this.open) {
       const done = this.updateOpen(c);
       if (done) emitted.push(done);
       return emitted; // one signal at a time per symbol
     }
+
+    if (this.blockedUntilSqueeze) return emitted;          // wait for a fresh squeeze after a WIN
 
     if (this.p.maxOpensPerHour > 0 && this.opensThisHour >= this.p.maxOpensPerHour) {
       return emitted; // hit the per-hour open limit
@@ -157,6 +164,8 @@ export class SqueezeBreakoutDetector {
       s.outcomePct = (c.close - s.entryPrice) / s.entryPrice * 100;
       this.resolved.push(s);
       this.open = null;
+      // after a WIN, block new OPENs until a fresh squeeze candle appears
+      if (state === 'WIN') this.blockedUntilSqueeze = true;
       return s;
     };
 

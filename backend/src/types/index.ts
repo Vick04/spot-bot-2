@@ -152,6 +152,7 @@ export interface SymbolSignalCounts {
   fail: number;
   flat: number;
   total: number;
+  blocked: boolean;   // OPEN suppressed until a fresh squeeze appears (post-WIN)
 }
 
 export interface DetectorSnapshot {
