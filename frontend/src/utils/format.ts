@@ -33,20 +33,3 @@ export function fmtTime(ms: number | null | undefined): string {
 export function fmtDuration(ms: number): string {
   return fmtTime(ms);
 }
-
-/** Date and time format: "01/06 15:30:45" (DD/MM HH:MM:SS) */
-export function fmtDateTime(ts: number): string {
-  const date = new Date(ts);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${day}/${month} ${hours}:${minutes}:${seconds}`;
-}
-
-/** Generate Binance spot trading link for a symbol. E.g. BTCUSDT -> https://www.binance.com/es-AR/trade/BTC_USDT?type=spot */
-export function getBinanceLink(symbol: string): string {
-  const pair = symbol.replace('USDT', '').concat('_USDT');
-  return `https://www.binance.com/es-AR/trade/${pair}?type=spot`;
-}

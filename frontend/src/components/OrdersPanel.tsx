@@ -1,5 +1,5 @@
-import { OrderStatus, CompletedOrder, ObserverData } from '../types';
-import { fmtPrice, fmtUsdt, fmtDuration, fmtDateTime, getBinanceLink } from '../utils/format';
+import { OrderStatus, CompletedOrder } from '../types';
+import { fmtPrice, fmtUsdt, fmtDuration } from '../utils/format';
 
 const TOGGLE_URL = '/api/orders/toggle';
 const FORCE_SELL_URL = '/api/orders/force-sell';
@@ -8,7 +8,10 @@ const BOT_RESET_URL = '/api/bot/reset';
 interface Props {
   status: OrderStatus;
   history: CompletedOrder[];
-  observers: Map<string, ObserverData>;
+}
+
+function fmtDate(ts: number): string {
+  return new Date(ts).toLocaleTimeString();
 }
 
 function ToggleButton({ enabled }: { enabled: boolean }) {
@@ -61,9 +64,8 @@ function ResetBotButton() {
   );
 }
 
-function ActiveOrderCard({ status, observers }: { status: OrderStatus; observers: Map<string, ObserverData> }) {
+function ActiveOrderCard({ status }: { status: OrderStatus }) {
   const o = status.activeOrder;
-  const currentPrice = o ? observers.get(o.symbol)?.candle1s?.close : null;
 
   return (
     <div className="rounded-lg border border-gray-700 p-4 space-y-4">
@@ -103,15 +105,9 @@ function ActiveOrderCard({ status, observers }: { status: OrderStatus; observers
           </div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs font-mono">
             <div className="text-gray-400">Symbol</div>
-            <div className="text-yellow-400 font-semibold">
-              <a href={getBinanceLink(o.symbol)} target="_blank" rel="noopener noreferrer" className="hover:text-yellow-300 underline">
-                {o.symbol}
-              </a>
-            </div>
+            <div className="text-yellow-400 font-semibold">{o.symbol}</div>
             <div className="text-gray-400">Buy price</div>
             <div>{fmtPrice(o.buyPrice)}</div>
-            <div className="text-gray-400">Current price</div>
-            <div className="text-blue-400">{fmtPrice(currentPrice)}</div>
             <div className="text-gray-400">Target price</div>
             <div className="text-green-400">{fmtPrice(o.targetPrice)}</div>
             <div className="text-gray-400">Quantity</div>
@@ -119,7 +115,7 @@ function ActiveOrderCard({ status, observers }: { status: OrderStatus; observers
             <div className="text-gray-400">USDT spent</div>
             <div>{fmtUsdt(o.usdtSpent)}</div>
             <div className="text-gray-400">Opened at</div>
-            <div>{fmtDateTime(o.openedAt)}</div>
+            <div>{fmtDate(o.openedAt)}</div>
           </div>
         </div>
       ) : (
@@ -167,11 +163,7 @@ function HistoryTable({ history }: { history: CompletedOrder[] }) {
                 const profitColor = o.profit >= 0 ? 'text-green-400' : 'text-red-400';
                 return (
                   <tr key={o.closedAt} className={`${bg} hover:bg-gray-700 transition-colors text-xs`}>
-                    <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400">
-                      <a href={getBinanceLink(o.symbol)} target="_blank" rel="noopener noreferrer" className="hover:text-yellow-300 underline">
-                        {o.symbol}
-                      </a>
-                    </td>
+                    <td className="px-3 py-1.5 font-mono font-semibold text-yellow-400">{o.symbol}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(o.buyPrice)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPrice(o.sellPrice)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtUsdt(o.usdtSpent)}</td>
@@ -183,7 +175,7 @@ function HistoryTable({ history }: { history: CompletedOrder[] }) {
                       {o.profitPct.toFixed(3)}%
                     </td>
                     <td className="px-3 py-1.5 text-right font-mono text-gray-400">{fmtDuration(o.durationMs)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-gray-400">{fmtDateTime(o.closedAt)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-gray-400">{fmtDate(o.closedAt)}</td>
                   </tr>
                 );
               })
@@ -195,10 +187,10 @@ function HistoryTable({ history }: { history: CompletedOrder[] }) {
   );
 }
 
-export function OrdersPanel({ status, history, observers }: Props) {
+export function OrdersPanel({ status, history }: Props) {
   return (
     <div className="space-y-4">
-      <ActiveOrderCard status={status} observers={observers} />
+      <ActiveOrderCard status={status} />
       <HistoryTable history={history} />
     </div>
   );

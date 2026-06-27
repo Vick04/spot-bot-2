@@ -3,7 +3,6 @@ import { Server as SocketIO } from 'socket.io';
 import { ObserverManager } from '../managers/ObserverManager';
 import { TopSymbolsManager } from '../managers/TopSymbolsManager';
 import { OrderManager } from '../managers/OrderManager';
-import { BollingerManager } from '../managers/BollingerManager';
 import { ActiveOrder, CompletedOrder } from '../types';
 
 export function createSocketServer(
@@ -11,7 +10,6 @@ export function createSocketServer(
   observerManager: ObserverManager,
   topSymbolsManager: TopSymbolsManager,
   orderManager: OrderManager,
-  bollingerManager: BollingerManager,
 ): void {
   const io = new SocketIO(httpServer, { cors: { origin: '*' } });
 
@@ -24,8 +22,6 @@ export function createSocketServer(
       orderStatus: orderManager.getStatus(),
       orderHistory: orderManager.getHistory(),
     });
-
-    socket.emit('detector:snapshot', bollingerManager.getSignals());
 
     socket.on('disconnect', () => {
       console.log(`[WS] Client disconnected: ${socket.id}`);
@@ -63,17 +59,4 @@ export function createSocketServer(
     io.emit('order:sell', completed);
     io.emit('order:history', orderManager.getHistory());
   });
-
-  // Bollinger 1m detector — isolated event channel
-  bollingerManager.on('signal', () => {
-    io.emit('detector:snapshot', bollingerManager.getSignals());
-  });
-
-  bollingerManager.on('resolved', () => {
-    io.emit('detector:snapshot', bollingerManager.getSignals());
-  });
-
-  // Periodic refresh so the per-symbol blocked state stays live (it clears on a
-  // squeeze candle, which emits no signal event).
-  setInterval(() => io.emit('detector:snapshot', bollingerManager.getSignals()), 4000);
 }

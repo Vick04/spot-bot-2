@@ -15,28 +15,16 @@ interface ExchangeInfoSymbol {
   symbol: string;
   status: string;
   quoteAsset: string;
-  isSpotTradingAllowed: boolean;
-  isMarginTradingAllowed: boolean;
-  permissions: string[];
 }
 
 interface ExchangeInfo {
   symbols: ExchangeInfoSymbol[];
 }
 
-export interface SymbolStatus {
-  symbol: string;
-  status: 'TRADING' | 'HALT' | 'BREAK' | 'PENDING_TRADING' | 'CANCEL_TRADING' | 'PAUSE_TRADING' | string;
-  isSpotTradingAllowed: boolean;
-  isMarginTradingAllowed: boolean;
-  tradingAllowed: boolean; // computed: status === 'TRADING' && isSpotTradingAllowed
-}
-
 export class SymbolManager extends EventEmitter {
   private symbols: string[] = [];
   private lastUpdated: string = '';
   private updateTimer: NodeJS.Timeout | null = null;
-  private symbolStatus: Map<string, SymbolStatus> = new Map();
 
   async load(): Promise<void> {
     try {
@@ -63,19 +51,6 @@ export class SymbolManager extends EventEmitter {
     return this.lastUpdated;
   }
 
-  getSymbolStatus(symbol: string): SymbolStatus | null {
-    return this.symbolStatus.get(symbol) ?? null;
-  }
-
-  getAllSymbolStatus(): SymbolStatus[] {
-    return Array.from(this.symbolStatus.values());
-  }
-
-  isSymbolTradable(symbol: string): boolean {
-    const status = this.symbolStatus.get(symbol);
-    return status?.tradingAllowed ?? false;
-  }
-
   private scheduleUpdate(): void {
     this.updateTimer = setInterval(async () => {
       await this.fetchFromBinance();
@@ -86,21 +61,8 @@ export class SymbolManager extends EventEmitter {
     console.log('[SymbolManager] Fetching symbols from Binance...');
     try {
       const data = await this.get<ExchangeInfo>(`${BINANCE_REST_URL}${EXCHANGE_INFO_ENDPOINT}`);
-
-      // Update symbol status map for all symbols
-      this.symbolStatus.clear();
-      data.symbols.forEach(s => {
-        this.symbolStatus.set(s.symbol, {
-          symbol: s.symbol,
-          status: s.status as SymbolStatus['status'],
-          isSpotTradingAllowed: s.isSpotTradingAllowed,
-          isMarginTradingAllowed: s.isMarginTradingAllowed,
-          tradingAllowed: s.status === 'TRADING' && s.isSpotTradingAllowed,
-        });
-      });
-
       const tradingUsdtSymbols = data.symbols
-        .filter(s => s.status === 'TRADING' && s.quoteAsset === 'USDT' && s.isSpotTradingAllowed)
+        .filter(s => s.status === 'TRADING' && s.quoteAsset === 'USDT')
         .map(s => s.symbol);
 
       this.symbols = tradingUsdtSymbols;
