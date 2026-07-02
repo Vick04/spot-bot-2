@@ -10,6 +10,12 @@ export class OrderManager extends EventEmitter {
   private activeOrder: ActiveOrder | null = null;
   private history: CompletedOrder[] = [];
   private enabled: boolean = false;
+  private clock: () => number;
+
+  constructor(clock: () => number = Date.now) {
+    super();
+    this.clock = clock;
+  }
 
   isEnabled(): boolean {
     return this.enabled;
@@ -36,7 +42,7 @@ export class OrderManager extends EventEmitter {
     const targetPrice = price * TARGET_MULT;
 
     this.balance = 0;
-    this.activeOrder = { symbol, buyPrice: price, quantity, targetPrice, usdtSpent, openedAt: Date.now() };
+    this.activeOrder = { symbol, buyPrice: price, quantity, targetPrice, usdtSpent, openedAt: this.clock() };
 
     console.log(`[Order] BUY  ${symbol} @ ${price} | qty: ${quantity.toFixed(6)} | target: ${targetPrice.toFixed(8)}`);
     this.emit('buy', this.activeOrder);
@@ -53,6 +59,13 @@ export class OrderManager extends EventEmitter {
   forceSell(price: number): void {
     if (!this.activeOrder) return;
     this.sell(price);
+  }
+
+  cancelActiveOrder(): void {
+    if (!this.activeOrder) return;
+    console.log(`[Order] CANCEL ${this.activeOrder.symbol} — restoring balance to ${this.activeOrder.usdtSpent.toFixed(4)} USDT`);
+    this.balance = this.activeOrder.usdtSpent;
+    this.activeOrder = null;
   }
 
   reset(): void {
@@ -83,7 +96,7 @@ export class OrderManager extends EventEmitter {
     const usdtReceived = rawUsdt * (1 - FEE);   // sell fee deducted from usdt received
     const profit = usdtReceived - order.usdtSpent;
     const profitPct = (profit / order.usdtSpent) * 100;
-    const closedAt = Date.now();
+    const closedAt = this.clock();
 
     const completed: CompletedOrder = {
       symbol: order.symbol,
