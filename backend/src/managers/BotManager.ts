@@ -5,6 +5,7 @@ import { OrderManager } from './OrderManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
 import { fetchHistoricalCandles } from '../services/historicalCandles';
 import { ObserverState } from '../types';
+import { evaluateTick } from './tradingPipeline';
 
 export class BotManager {
   readonly symbolManager: SymbolManager;
@@ -37,16 +38,7 @@ export class BotManager {
       const price = state.candle1s?.close;
       if (price == null) return;
 
-      // Check sell condition first
-      this.orderManager.onPriceTick(symbol, price);
-
-      // Check buy condition: symbol must be readyToBuy and in top 25
-      if (!this.orderManager.hasActiveOrder() && state.impulseTracking.readyToBuy) {
-        const inTop25 = this.topSymbolsManager.getTop25Symbols().includes(symbol);
-        if (inTop25) {
-          this.orderManager.buy(symbol, price);
-        }
-      }
+      evaluateTick(symbol, price, state, this.topSymbolsManager, this.orderManager);
     });
 
     this.ws = new BinanceWebSocket(symbols);
