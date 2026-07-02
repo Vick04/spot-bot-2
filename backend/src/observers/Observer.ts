@@ -10,11 +10,13 @@ export class Observer {
   private impulseTracker: ImpulseTracker;
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
+  private mode: 'live' | 'emulation';
 
-  constructor(symbol: string) {
+  constructor(symbol: string, options?: { mode?: 'live' | 'emulation'; clock?: () => number }) {
     this.symbol = symbol;
     this.queue1m = new Queue<Candle>(MA_PERIOD);
-    this.impulseTracker = new ImpulseTracker();
+    this.impulseTracker = new ImpulseTracker(options?.clock);
+    this.mode = options?.mode ?? 'live';
   }
 
   preload(candles: Candle[]): void {
@@ -34,6 +36,14 @@ export class Observer {
 
   updateCandle1m(candle: Candle): void {
     this.lastCandle1m = candle;
+
+    if (this.mode === 'emulation' && candle.isClosed) {
+      const ma99 = this.calculateMA99();
+      if (ma99 !== null) {
+        this.impulseTracker.process(candle.high, ma99);
+      }
+    }
+
     // Only closed 1m candles feed the MA99 queue
     if (candle.isClosed) {
       this.queue1m.push(candle);
