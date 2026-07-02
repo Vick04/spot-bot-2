@@ -1,3 +1,7 @@
+// Usage: npm run emulate -- [--symbols=BTCUSDT,ETHUSDT] [--limit=100000] [--out=path/to/report.md]
+//   --symbols= comma-separated symbols to emulate (default: all symbols found in history/)
+//   --limit=   max 1m candles per symbol to process (default: all available candles)
+//   --out=     output path for the generated report (default: results/emulation-<timestamp>.md)
 import fs from 'fs';
 import path from 'path';
 import { EmulatorEngine } from './EmulatorEngine';

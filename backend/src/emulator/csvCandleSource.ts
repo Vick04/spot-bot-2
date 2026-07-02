@@ -35,14 +35,25 @@ async function* readSymbolCandles(historyDir: string, symbol: string, limit?: nu
 
     const [openTimeStr, openStr, highStr, lowStr, closeStr] = line.split(',');
 
+    const openTime = Number(openTimeStr);
+    const open = Number(openStr);
+    const high = Number(highStr);
+    const low = Number(lowStr);
+    const close = Number(closeStr);
+
+    if (Number.isNaN(openTime) || Number.isNaN(open) || Number.isNaN(high) || Number.isNaN(low) || Number.isNaN(close)) {
+      console.warn(`[csvCandleSource] Skipping malformed row for ${symbol}: ${line}`);
+      continue;
+    }
+
     yield {
       symbol,
       timeframe: '1m',
-      openTime: Number(openTimeStr),
-      open: Number(openStr),
-      high: Number(highStr),
-      low: Number(lowStr),
-      close: Number(closeStr),
+      openTime,
+      open,
+      high,
+      low,
+      close,
       isClosed: true,
     };
 
