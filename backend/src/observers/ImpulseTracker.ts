@@ -13,6 +13,11 @@ export class ImpulseTracker {
   private allowedActivatedAt: number | null = null;
   private timings: number[] = [];
   private averageTime: number | null = null;
+  private clock: () => number;
+
+  constructor(clock: () => number = Date.now) {
+    this.clock = clock;
+  }
 
   /**
    * Process a new 1s close price against the current MA99.
@@ -41,7 +46,7 @@ export class ImpulseTracker {
     // Step 3: allow — price recovers +0.8% from floor
     if (!this.allowed && close >= this.floor * ALLOWED_THRESHOLD) {
       this.allowed = true;
-      this.allowedActivatedAt = Date.now();
+      this.allowedActivatedAt = this.clock();
     }
 
     // Step 4: reached — price hits +1.3% from floor
@@ -49,7 +54,7 @@ export class ImpulseTracker {
       this.reached = true;
 
       if (this.allowedActivatedAt !== null) {
-        const elapsed = Date.now() - this.allowedActivatedAt;
+        const elapsed = this.clock() - this.allowedActivatedAt;
         this.timings.push(elapsed);
         this.averageTime = this.timings.reduce((a, b) => a + b, 0) / this.timings.length;
       }
@@ -61,7 +66,7 @@ export class ImpulseTracker {
 
   get currentElapsedTime(): number | null {
     if (!this.allowed || this.allowedActivatedAt === null) return null;
-    return Date.now() - this.allowedActivatedAt;
+    return this.clock() - this.allowedActivatedAt;
   }
 
   get readyToBuy(): boolean {
