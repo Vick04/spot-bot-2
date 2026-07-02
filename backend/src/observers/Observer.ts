@@ -11,6 +11,7 @@ export class Observer {
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
   private mode: 'live' | 'emulation';
+  private ma99Sum = 0;
 
   constructor(symbol: string, options?: { mode?: 'live' | 'emulation'; clock?: () => number }) {
     this.symbol = symbol;
@@ -21,7 +22,7 @@ export class Observer {
 
   preload(candles: Candle[]): void {
     for (const candle of candles) {
-      this.queue1m.push(candle);
+      this.pushToMA99Queue(candle);
     }
   }
 
@@ -46,7 +47,7 @@ export class Observer {
 
     // Only closed 1m candles feed the MA99 queue
     if (candle.isClosed) {
-      this.queue1m.push(candle);
+      this.pushToMA99Queue(candle);
     }
   }
 
@@ -54,11 +55,15 @@ export class Observer {
     return this.queue1m.isFull();
   }
 
+  /**
+   * O(1) — maintained as a running sum (updated in pushToMA99Queue) instead
+   * of rebuilding the 99-candle array on every call. This function is on the
+   * hot path: it runs multiple times per candle across Observer/ObserverManager,
+   * and the emulator drives ~81M candles per full run.
+   */
   calculateMA99(): number | null {
     if (!this.queue1m.isFull()) return null;
-    const candles = this.queue1m.toArray();
-    const sum = candles.reduce((acc, c) => acc + c.close, 0);
-    return sum / MA_PERIOD;
+    return this.ma99Sum / MA_PERIOD;
   }
 
   resetImpulseTracker(): void {
@@ -78,6 +83,14 @@ export class Observer {
       isReady: this.isReady(),
       impulseTracking: this.impulseTracker.getSnapshot(),
     };
+  }
+
+  private pushToMA99Queue(candle: Candle): void {
+    const evicted = this.queue1m.push(candle);
+    this.ma99Sum += candle.close;
+    if (evicted !== undefined) {
+      this.ma99Sum -= evicted.close;
+    }
   }
 }
 

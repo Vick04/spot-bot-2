@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import readline from 'readline';
 import { Candle } from '../types';
+
+const READ_CHUNK_BYTES = 1 << 20; // 1MB
 
 export function listHistorySymbols(historyDir: string): string[] {
   return fs
@@ -13,73 +14,92 @@ export function listHistorySymbols(historyDir: string): string[] {
 
 interface SymbolCursor {
   symbol: string;
-  iterator: AsyncIterator<Candle>;
+  iterator: Iterator<Candle>;
   next: Candle | null;
 }
 
-async function* readSymbolCandles(historyDir: string, symbol: string, limit?: number): AsyncGenerator<Candle> {
-  const filePath = path.join(historyDir, symbol, `${symbol}_1m.csv`);
-  const fileStream = fs.createReadStream(filePath, { encoding: 'utf-8' });
-  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+function parseCandleLine(symbol: string, line: string): Candle | null {
+  const [openTimeStr, openStr, highStr, lowStr, closeStr] = line.split(',');
 
+  const openTime = Number(openTimeStr);
+  const open = Number(openStr);
+  const high = Number(highStr);
+  const low = Number(lowStr);
+  const close = Number(closeStr);
+
+  if (Number.isNaN(openTime) || Number.isNaN(open) || Number.isNaN(high) || Number.isNaN(low) || Number.isNaN(close)) {
+    console.warn(`[csvCandleSource] Skipping malformed row for ${symbol}: ${line}`);
+    return null;
+  }
+
+  return { symbol, timeframe: '1m', openTime, open, high, low, close, isClosed: true };
+}
+
+/**
+ * Reads a symbol's 1m CSV via synchronous, fixed-size buffered reads —
+ * never loads the full file into memory, and avoids the per-line promise
+ * overhead of readline/async generators (significant at ~81M total rows).
+ */
+function* readSymbolCandles(historyDir: string, symbol: string, limit?: number): Generator<Candle> {
+  const filePath = path.join(historyDir, symbol, `${symbol}_1m.csv`);
+  const fd = fs.openSync(filePath, 'r');
+  const buffer = Buffer.alloc(READ_CHUNK_BYTES);
+
+  let leftover = '';
   let isHeader = true;
   let count = 0;
 
-  for await (const line of rl) {
-    if (isHeader) {
-      isHeader = false;
-      continue;
+  try {
+    let bytesRead: number;
+    while ((bytesRead = fs.readSync(fd, buffer, 0, READ_CHUNK_BYTES, null)) > 0) {
+      const chunk = leftover + buffer.toString('utf-8', 0, bytesRead);
+      const lines = chunk.split('\n');
+      leftover = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (isHeader) {
+          isHeader = false;
+          continue;
+        }
+        if (!line) continue;
+        if (limit !== undefined && count >= limit) return;
+
+        const candle = parseCandleLine(symbol, line);
+        if (candle === null) continue;
+
+        yield candle;
+        count++;
+      }
     }
-    if (!line) continue;
-    if (limit !== undefined && count >= limit) break;
 
-    const [openTimeStr, openStr, highStr, lowStr, closeStr] = line.split(',');
-
-    const openTime = Number(openTimeStr);
-    const open = Number(openStr);
-    const high = Number(highStr);
-    const low = Number(lowStr);
-    const close = Number(closeStr);
-
-    if (Number.isNaN(openTime) || Number.isNaN(open) || Number.isNaN(high) || Number.isNaN(low) || Number.isNaN(close)) {
-      console.warn(`[csvCandleSource] Skipping malformed row for ${symbol}: ${line}`);
-      continue;
+    // Final line if the file doesn't end with a trailing newline
+    if (leftover && !isHeader && !(limit !== undefined && count >= limit)) {
+      const candle = parseCandleLine(symbol, leftover);
+      if (candle !== null) yield candle;
     }
-
-    yield {
-      symbol,
-      timeframe: '1m',
-      openTime,
-      open,
-      high,
-      low,
-      close,
-      isClosed: true,
-    };
-
-    count++;
+  } finally {
+    fs.closeSync(fd);
   }
-
-  rl.close();
-  fileStream.close();
 }
 
 /**
  * Merges each symbol's 1m candle stream into a single ascending-openTime
  * stream, without loading any file fully into memory. Uses a simple O(n)
  * linear scan per step over the (small, <=175) set of active cursors —
- * a heap is unnecessary at this fan-in size.
+ * a heap is unnecessary at this fan-in size. Synchronous generator (no
+ * async/await) since the underlying reads are synchronous; `for await`
+ * over a sync generator still works for callers that iterate this way.
  */
-export async function* streamMergedCandles(
+export function* streamMergedCandles(
   historyDir: string,
   symbols: string[],
   limitPerSymbol?: number
-): AsyncGenerator<Candle> {
+): Generator<Candle> {
   const cursors: SymbolCursor[] = [];
 
   for (const symbol of symbols) {
-    const iterator = readSymbolCandles(historyDir, symbol, limitPerSymbol)[Symbol.asyncIterator]();
-    const first = await iterator.next();
+    const iterator = readSymbolCandles(historyDir, symbol, limitPerSymbol)[Symbol.iterator]();
+    const first = iterator.next();
     if (!first.done) {
       cursors.push({ symbol, iterator, next: first.value });
     }
@@ -96,7 +116,7 @@ export async function* streamMergedCandles(
     const cursor = cursors[minIndex];
     yield cursor.next!;
 
-    const result = await cursor.iterator.next();
+    const result = cursor.iterator.next();
     if (result.done) {
       cursors.splice(minIndex, 1);
     } else {

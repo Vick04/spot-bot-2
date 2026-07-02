@@ -9,11 +9,13 @@ export class Queue<T> {
     this.capacity = capacity;
   }
 
-  push(item: T): void {
+  /** Pushes an item; returns the evicted item if one was pushed out, else undefined. */
+  push(item: T): T | undefined {
     this.items.push(item);
     if (this.items.length > this.capacity) {
-      this.items.shift();
+      return this.items.shift();
     }
+    return undefined;
   }
 
   isFull(): boolean {
