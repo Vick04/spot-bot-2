@@ -4,10 +4,16 @@ import { Candle, ObserverState } from '../types';
 
 export class ObserverManager extends EventEmitter {
   private observers: Map<string, Observer> = new Map();
+  private options?: { mode?: 'live' | 'emulation'; clock?: () => number };
+
+  constructor(options?: { mode?: 'live' | 'emulation'; clock?: () => number }) {
+    super();
+    this.options = options;
+  }
 
   createObserver(symbol: string): void {
     if (!this.observers.has(symbol)) {
-      this.observers.set(symbol, new Observer(symbol));
+      this.observers.set(symbol, new Observer(symbol, this.options));
     }
   }
 
