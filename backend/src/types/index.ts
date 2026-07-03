@@ -1,4 +1,4 @@
-export type CandleTimeframe = '1s' | '1m';
+export type CandleTimeframe = '1s' | '1m' | '1h';
 
 export interface Candle {
   symbol: string;
@@ -34,6 +34,7 @@ export interface ActiveOrder {
   buyPrice: number;
   quantity: number;
   targetPrice: number;
+  stopLossPrice: number;
   usdtSpent: number;
   openedAt: number;
 }

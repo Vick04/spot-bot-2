@@ -1,7 +1,7 @@
 import { ImpulseTrackingSnapshot } from '../types';
 
-const ALLOWED_THRESHOLD = 1.008;  // +0.8%
-const REACHED_THRESHOLD = 1.013;  // +1.3%
+const ALLOWED_THRESHOLD = 1.063;  // +0.8%
+const REACHED_THRESHOLD = 1.068;  // +1.3%
 const READY_TO_BUY_WINDOW_MS = 10_000;
 
 export class ImpulseTracker {
@@ -22,11 +22,15 @@ export class ImpulseTracker {
   /**
    * Process a new 1s close price against the current MA99.
    * Must only be called when MA99 is available.
+   *
+   * `hourGateOpen` gates Step 1 only: the initial floor is set only when the
+   * price condition against MA99 holds AND the 1h gate is open (computed by the
+   * caller from the last closed 1h candle's indicators). No effect on Steps 2-4.
    */
-  process(close: number, ma99: number): void {
-    // Step 1: set floor — price dips below MA99
+  process(close: number, ma99: number, hourGateOpen: boolean): void {
+    // Step 1: set floor — price condition against MA99 and the 1h gate is open
     if (this.floor === undefined) {
-      if (close < ma99) {
+      if (close < ma99 && hourGateOpen) {
         this.floor = close;
         this.ma99AtFloorSet = ma99;
         this.allowed = false;

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Candle } from '../types';
+import { Candle, CandleTimeframe } from '../types';
 
 const READ_CHUNK_BYTES = 1 << 20; // 1MB
 
@@ -18,7 +18,7 @@ interface SymbolCursor {
   next: Candle | null;
 }
 
-function parseCandleLine(symbol: string, line: string): Candle | null {
+function parseCandleLine(symbol: string, timeframe: CandleTimeframe, line: string): Candle | null {
   const [openTimeStr, openStr, highStr, lowStr, closeStr] = line.split(',');
 
   const openTime = Number(openTimeStr);
@@ -32,16 +32,23 @@ function parseCandleLine(symbol: string, line: string): Candle | null {
     return null;
   }
 
-  return { symbol, timeframe: '1m', openTime, open, high, low, close, isClosed: true };
+  return { symbol, timeframe, openTime, open, high, low, close, isClosed: true };
 }
 
 /**
- * Reads a symbol's 1m CSV via synchronous, fixed-size buffered reads —
- * never loads the full file into memory, and avoids the per-line promise
- * overhead of readline/async generators (significant at ~81M total rows).
+ * Reads a symbol's OHLC CSV (`<symbol>_<interval>.csv`) via synchronous,
+ * fixed-size buffered reads — never loads the full file into memory, and
+ * avoids the per-line promise overhead of readline/async generators
+ * (significant at ~81M total 1m rows).
  */
-function* readSymbolCandles(historyDir: string, symbol: string, limit?: number): Generator<Candle> {
-  const filePath = path.join(historyDir, symbol, `${symbol}_1m.csv`);
+function* readSymbolCsv(
+  historyDir: string,
+  symbol: string,
+  interval: string,
+  timeframe: CandleTimeframe,
+  limit?: number
+): Generator<Candle> {
+  const filePath = path.join(historyDir, symbol, `${symbol}_${interval}.csv`);
   const fd = fs.openSync(filePath, 'r');
   const buffer = Buffer.alloc(READ_CHUNK_BYTES);
 
@@ -64,7 +71,7 @@ function* readSymbolCandles(historyDir: string, symbol: string, limit?: number):
         if (!line) continue;
         if (limit !== undefined && count >= limit) return;
 
-        const candle = parseCandleLine(symbol, line);
+        const candle = parseCandleLine(symbol, timeframe, line);
         if (candle === null) continue;
 
         yield candle;
@@ -74,12 +81,21 @@ function* readSymbolCandles(historyDir: string, symbol: string, limit?: number):
 
     // Final line if the file doesn't end with a trailing newline
     if (leftover && !isHeader && !(limit !== undefined && count >= limit)) {
-      const candle = parseCandleLine(symbol, leftover);
+      const candle = parseCandleLine(symbol, timeframe, leftover);
       if (candle !== null) yield candle;
     }
   } finally {
     fs.closeSync(fd);
   }
+}
+
+function readSymbolCandles(historyDir: string, symbol: string, limit?: number): Generator<Candle> {
+  return readSymbolCsv(historyDir, symbol, '1m', '1m', limit);
+}
+
+/** Reads a symbol's ascending-openTime closed 1h candles from `<symbol>_1h.csv`. */
+export function readSymbolHourCandles(historyDir: string, symbol: string): Generator<Candle> {
+  return readSymbolCsv(historyDir, symbol, '1h', '1h');
 }
 
 /**

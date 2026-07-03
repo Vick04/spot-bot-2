@@ -3,7 +3,7 @@ import { ObserverManager } from './ObserverManager';
 import { TopSymbolsManager } from './TopSymbolsManager';
 import { OrderManager } from './OrderManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
-import { fetchHistoricalCandles } from '../services/historicalCandles';
+import { fetchHistoricalCandles, fetchClosedHourCandles } from '../services/historicalCandles';
 import { ObserverState } from '../types';
 import { evaluateTick } from './tradingPipeline';
 
@@ -90,5 +90,23 @@ export class BotManager {
     failed.forEach(r => console.error('[Preload] Failed:', (r as PromiseRejectedResult).reason));
 
     console.log(`[Preload] Done — ${ok}/${symbols.length} observers ready`);
+
+    // Preload closed 1h candles to warm up the 99-close window backing the
+    // Step 1 gate, so it works from the start. A failure here must not block
+    // trading; the gate simply stays closed for that symbol until its window
+    // fills from live 1h closes.
+    const hourResults = await Promise.allSettled(
+      symbols.map(async symbol => {
+        const candles = await fetchClosedHourCandles(symbol);
+        this.observerManager.preloadObserverHours(symbol, candles);
+      })
+    );
+
+    const hourOk = hourResults.filter(r => r.status === 'fulfilled').length;
+    hourResults
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .forEach(r => console.error('[Preload] 1h candles failed:', r.reason));
+
+    console.log(`[Preload] Done — ${hourOk}/${symbols.length} symbols' 1h windows loaded`);
   }
 }

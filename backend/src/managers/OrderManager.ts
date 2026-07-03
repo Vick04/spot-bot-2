@@ -4,6 +4,7 @@ import { ActiveOrder, CompletedOrder, OrderStatus } from '../types';
 const INITIAL_BALANCE = 10_000;
 const FEE = 0.001;           // 0.1% applied on buy (asset) and sell (usdt)
 const TARGET_MULT = 1.005;   // +0.5% sell target
+const STOP_LOSS_MULT = 0.0001; // -3% stop loss
 
 export class OrderManager extends EventEmitter {
   private balance: number = INITIAL_BALANCE;
@@ -40,25 +41,34 @@ export class OrderManager extends EventEmitter {
     const rawQuantity = usdtSpent / price;
     const quantity = rawQuantity * (1 - FEE);   // buy fee deducted from asset received
     const targetPrice = price * TARGET_MULT;
+    const stopLossPrice = price * STOP_LOSS_MULT;
 
     this.balance = 0;
-    this.activeOrder = { symbol, buyPrice: price, quantity, targetPrice, usdtSpent, openedAt: this.clock() };
+    this.activeOrder = { symbol, buyPrice: price, quantity, targetPrice, stopLossPrice, usdtSpent, openedAt: this.clock() };
 
-    console.log(`[Order] BUY  ${symbol} @ ${price} | qty: ${quantity.toFixed(6)} | target: ${targetPrice.toFixed(8)}`);
+    console.log(`[Order] BUY  ${symbol} @ ${price} | qty: ${quantity.toFixed(6)} | target: ${targetPrice.toFixed(8)} | stop: ${stopLossPrice.toFixed(8)}`);
     this.emit('buy', this.activeOrder);
   }
 
   onPriceTick(symbol: string, price: number): void {
     if (!this.activeOrder) return;
     if (this.activeOrder.symbol !== symbol) return;
-    if (price < this.activeOrder.targetPrice) return;
 
-    this.sell(price);
+    // Stop loss: cut the position at -3% or worse.
+    if (price <= this.activeOrder.stopLossPrice) {
+      this.sell(price, 'stop');
+      return;
+    }
+
+    // Take profit: sell once the target is reached.
+    if (price >= this.activeOrder.targetPrice) {
+      this.sell(price, 'target');
+    }
   }
 
   forceSell(price: number): void {
     if (!this.activeOrder) return;
-    this.sell(price);
+    this.sell(price, 'force');
   }
 
   cancelActiveOrder(): void {
@@ -90,7 +100,7 @@ export class OrderManager extends EventEmitter {
     };
   }
 
-  private sell(price: number): void {
+  private sell(price: number, reason: 'target' | 'stop' | 'force' = 'target'): void {
     const order = this.activeOrder!;
     const rawUsdt = order.quantity * price;
     const usdtReceived = rawUsdt * (1 - FEE);   // sell fee deducted from usdt received
@@ -116,7 +126,7 @@ export class OrderManager extends EventEmitter {
     this.balance = usdtReceived;
     this.activeOrder = null;
 
-    console.log(`[Order] SELL ${completed.symbol} @ ${price} | profit: ${profit.toFixed(4)} USDT (${profitPct.toFixed(3)}%) | balance: ${this.balance.toFixed(4)}`);
+    console.log(`[Order] SELL ${completed.symbol} @ ${price} [${reason}] | profit: ${profit.toFixed(4)} USDT (${profitPct.toFixed(3)}%) | balance: ${this.balance.toFixed(4)}`);
     this.emit('sell', completed);
   }
 }

@@ -1,8 +1,10 @@
 import { Candle, CandleData, ObserverState } from '../types';
 import { Queue } from '../utils/Queue';
 import { ImpulseTracker } from './ImpulseTracker';
+import { hourGateOpen } from '../utils/indicators';
 
 const MA_PERIOD = 99;
+const HOUR_WINDOW = 99;
 
 export class Observer {
   private symbol: string;
@@ -10,12 +12,14 @@ export class Observer {
   private impulseTracker: ImpulseTracker;
   private lastCandle1s: Candle | null = null;
   private lastCandle1m: Candle | null = null;
+  private hourCloses: Queue<number>;
   private mode: 'live' | 'emulation';
   private ma99Sum = 0;
 
   constructor(symbol: string, options?: { mode?: 'live' | 'emulation'; clock?: () => number }) {
     this.symbol = symbol;
     this.queue1m = new Queue<Candle>(MA_PERIOD);
+    this.hourCloses = new Queue<number>(HOUR_WINDOW);
     this.impulseTracker = new ImpulseTracker(options?.clock);
     this.mode = options?.mode ?? 'live';
   }
@@ -31,7 +35,7 @@ export class Observer {
 
     const ma99 = this.calculateMA99();
     if (ma99 !== null) {
-      this.impulseTracker.process(candle.close, ma99);
+      this.impulseTracker.process(candle.close, ma99, this.hourGateOpen());
     }
   }
 
@@ -41,13 +45,20 @@ export class Observer {
     if (this.mode === 'emulation' && candle.isClosed) {
       const ma99 = this.calculateMA99();
       if (ma99 !== null) {
-        this.impulseTracker.process(candle.high, ma99);
+        this.impulseTracker.process(candle.high, ma99, this.hourGateOpen());
       }
     }
 
     // Only closed 1m candles feed the MA99 queue
     if (candle.isClosed) {
       this.pushToMA99Queue(candle);
+    }
+  }
+
+  /** Feed a closed 1h candle's close into the rolling window used by the Step 1 gate. */
+  updateCandle1h(candle: Candle): void {
+    if (candle.isClosed) {
+      this.hourCloses.push(candle.close);
     }
   }
 
@@ -83,6 +94,11 @@ export class Observer {
       isReady: this.isReady(),
       impulseTracking: this.impulseTracker.getSnapshot(),
     };
+  }
+
+  /** True when the last closed 1h candle's indicators open the Step 1 gate. */
+  private hourGateOpen(): boolean {
+    return hourGateOpen(this.hourCloses.toArray());
   }
 
   private pushToMA99Queue(candle: Candle): void {

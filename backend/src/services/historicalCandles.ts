@@ -1,5 +1,5 @@
 import https from 'https';
-import { Candle } from '../types';
+import { Candle, CandleTimeframe } from '../types';
 import { BINANCE_REST_URL } from '../config/binance';
 
 // Binance kline response columns
@@ -25,10 +25,10 @@ function get<T>(url: string): Promise<T> {
   });
 }
 
-function parseRow(symbol: string, row: BinanceKlineRow): Candle {
+function parseRow(symbol: string, timeframe: CandleTimeframe, row: BinanceKlineRow): Candle {
   return {
     symbol,
-    timeframe: '1m',
+    timeframe,
     openTime: row[0],
     open:     parseFloat(row[1]),
     high:     parseFloat(row[2]),
@@ -46,5 +46,20 @@ export async function fetchHistoricalCandles(symbol: string): Promise<Candle[]> 
   const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=1m&limit=100`;
   const rows = await get<BinanceKlineRow[]>(url);
   // Drop the last row (open/unconfirmed candle)
-  return rows.slice(0, 99).map(row => parseRow(symbol, row));
+  return rows.slice(0, 99).map(row => parseRow(symbol, '1m', row));
+}
+
+/**
+ * Fetches the last `limit` CLOSED 1h candles for a symbol (ascending). We
+ * request limit+1 and drop the last row (the currently open candle). The
+ * caller uses these to warm up the 99-close window backing the Step 1 gate.
+ */
+export async function fetchClosedHourCandles(symbol: string, limit = 120): Promise<Candle[]> {
+  const url = `${BINANCE_REST_URL}/api/v3/klines?symbol=${symbol}&interval=1h&limit=${limit + 1}`;
+  const rows = await get<BinanceKlineRow[]>(url);
+  const closed = rows.slice(0, rows.length - 1);
+  if (closed.length === 0) {
+    throw new Error(`No closed 1h candles available for ${symbol}`);
+  }
+  return closed.map(row => parseRow(symbol, '1h', row));
 }

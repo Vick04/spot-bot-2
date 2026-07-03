@@ -1,12 +1,13 @@
 {
   "name": "spot-bot-backend",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "emulate": "ts-node --transpile-only src/emulator/run.ts"
+    "emulate": "ts-node --transpile-only src/emulator/run.ts",
+    "test": "node --test --require ts-node/register 'src/**/*.test.ts'"
   },
   "dependencies": {
     "cors": "^2.8.5",
