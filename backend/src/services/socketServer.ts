@@ -1,7 +1,7 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIO } from 'socket.io';
 import { ObserverManager } from '../managers/ObserverManager';
-import { ObserverState } from '../types';
+import { ChartClosedEvent, ChartTickEvent, ObserverState } from '../types';
 
 export function createSocketServer(httpServer: HttpServer, observerManager: ObserverManager): void {
   const io = new SocketIO(httpServer, { cors: { origin: '*' } });
@@ -20,11 +20,11 @@ export function createSocketServer(httpServer: HttpServer, observerManager: Obse
     io.emit('signal', state);
   });
 
-  observerManager.on('chart:tick', (payload) => {
+  observerManager.on('chart:tick', (payload: ChartTickEvent) => {
     io.emit('chart:tick', payload);
   });
 
-  observerManager.on('chart:closed', (payload) => {
+  observerManager.on('chart:closed', (payload: ChartClosedEvent) => {
     io.emit('chart:closed', payload);
   });
 }

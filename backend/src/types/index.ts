@@ -59,3 +59,16 @@ export interface ChartData {
   candles: ChartCandle[];
   series: ChartSeries;
 }
+
+export interface ChartTickEvent {
+  symbol: string;
+  m1: { candle: ChartCandle; series: ChartSeriesPoint };
+  h1: { candle: ChartCandle; series: ChartSeriesPoint };
+}
+
+export interface ChartClosedEvent {
+  symbol: string;
+  timeframe: ChartTimeframe;
+  candle: ChartCandle;
+  series: ChartSeriesPoint;
+}

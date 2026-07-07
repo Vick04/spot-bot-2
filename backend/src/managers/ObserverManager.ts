@@ -52,7 +52,7 @@ export class ObserverManager extends EventEmitter {
       const m1 = this.getLatestChartPoint(candle.symbol, '1m');
       const h1 = this.getLatestChartPoint(candle.symbol, '1h');
 
-      if (m1 && h1) {
+      if (!candle.isClosed && m1 && h1) {
         this.emit('chart:tick', { symbol: candle.symbol, m1, h1 });
       }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChartCandle, ChartClosedEvent, ChartSeries, ChartTickEvent, ChartTimeframe } from '../types';
+import { ChartCandle, ChartClosedEvent, ChartSeries, ChartSeriesPoint, ChartTickEvent, ChartTimeframe } from '../types';
 import { getSocket } from './socket';
 
 interface ChartDataState {
@@ -11,6 +11,34 @@ interface ChartDataState {
 
 const EMPTY_SERIES: ChartSeries = { ma20: [], ma99: [], bbUpper: [], bbLower: [] };
 const VISIBLE_CANDLES = 100;
+
+/**
+ * Merges an incoming chart point (from `chart:tick` or `chart:closed`) into the
+ * current candles/series arrays.
+ *
+ * If the incoming point's openTime matches the last element's openTime, it
+ * REPLACES that element (same forming candle being updated, or the
+ * tick-then-closed race for the same closing candle). Otherwise, it APPENDS
+ * (a new candle has started forming). The result is always capped to
+ * VISIBLE_CANDLES.
+ */
+export function mergeChartPoint(
+  s: { candles: ChartCandle[]; series: ChartSeries },
+  point: { candle: ChartCandle; series: ChartSeriesPoint }
+): { candles: ChartCandle[]; series: ChartSeries } {
+  const lastCandle = s.candles[s.candles.length - 1];
+  const isReplacingLast = lastCandle !== undefined && lastCandle.openTime === point.candle.openTime;
+  const dropLast = <T,>(arr: T[]) => (isReplacingLast ? arr.slice(0, -1) : arr);
+
+  const candles = dropLast(s.candles).concat(point.candle).slice(-VISIBLE_CANDLES);
+  const series: ChartSeries = {
+    ma20: dropLast(s.series.ma20).concat(point.series.ma20).slice(-VISIBLE_CANDLES),
+    ma99: dropLast(s.series.ma99).concat(point.series.ma99).slice(-VISIBLE_CANDLES),
+    bbUpper: dropLast(s.series.bbUpper).concat(point.series.bbUpper).slice(-VISIBLE_CANDLES),
+    bbLower: dropLast(s.series.bbLower).concat(point.series.bbLower).slice(-VISIBLE_CANDLES),
+  };
+  return { candles, series };
+}
 
 export function useSymbolChartData(symbol: string, timeframe: ChartTimeframe): ChartDataState {
   const [state, setState] = useState<ChartDataState>({
@@ -46,38 +74,17 @@ export function useSymbolChartData(symbol: string, timeframe: ChartTimeframe): C
 
       setState(s => {
         if (s.candles.length === 0) return s;
-        const candles = s.candles.slice(0, -1).concat(point.candle);
-        const series: ChartSeries = {
-          ma20: s.series.ma20.slice(0, -1).concat(point.series.ma20),
-          ma99: s.series.ma99.slice(0, -1).concat(point.series.ma99),
-          bbUpper: s.series.bbUpper.slice(0, -1).concat(point.series.bbUpper),
-          bbLower: s.series.bbLower.slice(0, -1).concat(point.series.bbLower),
-        };
-        return { ...s, candles, series };
+        return { ...s, ...mergeChartPoint(s, point) };
       });
     };
 
     const handleClosed = (event: ChartClosedEvent) => {
       if (event.symbol !== symbol || event.timeframe !== timeframe) return;
 
-      setState(s => {
-        // chart:tick may have already placed this exact closing candle as the
-        // last element (see ObserverManager.updateCandle, which emits
-        // chart:tick then chart:closed for the same candle). If so, replace
-        // that element in place instead of appending a duplicate openTime.
-        const lastCandle = s.candles[s.candles.length - 1];
-        const isReplacingLast = lastCandle !== undefined && lastCandle.openTime === event.candle.openTime;
-        const dropLast = <T,>(arr: T[]) => (isReplacingLast ? arr.slice(0, -1) : arr);
-
-        const candles = dropLast(s.candles).concat(event.candle).slice(-VISIBLE_CANDLES);
-        const series: ChartSeries = {
-          ma20: dropLast(s.series.ma20).concat(event.series.ma20).slice(-VISIBLE_CANDLES),
-          ma99: dropLast(s.series.ma99).concat(event.series.ma99).slice(-VISIBLE_CANDLES),
-          bbUpper: dropLast(s.series.bbUpper).concat(event.series.bbUpper).slice(-VISIBLE_CANDLES),
-          bbLower: dropLast(s.series.bbLower).concat(event.series.bbLower).slice(-VISIBLE_CANDLES),
-        };
-        return { ...s, candles, series };
-      });
+      // chart:tick may have already placed this exact closing candle as the
+      // last element. If so, mergeChartPoint replaces that element in place
+      // instead of appending a duplicate openTime.
+      setState(s => ({ ...s, ...mergeChartPoint(s, { candle: event.candle, series: event.series }) }));
     };
 
     socket.on('chart:tick', handleTick);

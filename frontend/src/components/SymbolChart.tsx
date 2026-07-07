@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, CandlestickSeries, LineSeries, LineStyle, IChartApi, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
+import { createChart, CandlestickSeries, LineSeries, LineStyle, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { ChartTimeframe } from '../types';
 import { useSymbolChartData } from '../hooks/useSymbolChartData';
 
@@ -14,7 +14,6 @@ function toTime(openTimeMs: number): UTCTimestamp {
 
 export function SymbolChart({ symbol, timeframe }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const ma20SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const ma99SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -34,7 +33,6 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       timeScale: { timeVisible: true },
     });
 
-    chartRef.current = chart;
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
       upColor: '#22c55e',
       downColor: '#ef4444',
