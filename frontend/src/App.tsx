@@ -1,29 +1,10 @@
-import { useState } from 'react';
 import { useSocket } from './hooks/useSocket';
-import { SymbolTable } from './components/SymbolTable';
-import { Top25Table } from './components/Top25Table';
-import { ReadyTable } from './components/ReadyTable';
-import { OrdersPanel } from './components/OrdersPanel';
-
-type Tab = 'all' | 'top25' | 'ready' | 'orders';
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'all',    label: 'All Symbols' },
-  { id: 'top25',  label: 'Top 25'      },
-  { id: 'ready',  label: 'Ready'       },
-  { id: 'orders', label: 'Orders'      },
-];
+import { QualifyingList } from './components/QualifyingList';
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('all');
-  const { observers, top25, orderStatus, orderHistory, connected } = useSocket();
-
+  const { observers, connected } = useSocket();
   const observerList = Array.from(observers.values());
-  const readyList = observerList.filter(o => o.impulseTracking.readyToBuy);
-  const top25WithData = top25.map(entry => ({
-    ...entry,
-    obs: observers.get(entry.symbol) ?? null,
-  }));
+  const qualifyingCount = observerList.filter(o => o.qualifies).length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -31,9 +12,9 @@ export default function App() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">
             <span className="text-yellow-400">SPOT</span>
-            <span className="text-gray-400 font-light ml-1">BOT v2.0</span>
+            <span className="text-gray-400 font-light ml-1">BOT</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Live market observer</p>
+          <p className="text-xs text-gray-500 mt-0.5">Live signal detector — {qualifyingCount} qualifying</p>
         </div>
         <div className={`flex items-center gap-2 text-xs ${connected ? 'text-green-400' : 'text-red-400'}`}>
           <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`} />
@@ -41,34 +22,8 @@ export default function App() {
         </div>
       </header>
 
-      <div className="border-b border-gray-800 px-6">
-        <nav className="flex gap-1">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.id
-                  ? 'border-yellow-400 text-yellow-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              {t.label}
-              {t.id === 'ready' && readyList.length > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-green-500 text-black font-bold">
-                  {readyList.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-      </div>
-
       <main className="px-6 py-6">
-        {tab === 'all'    && <SymbolTable observers={observerList} />}
-        {tab === 'top25'  && <Top25Table entries={top25WithData} />}
-        {tab === 'ready'  && <ReadyTable observers={readyList} />}
-        {tab === 'orders' && <OrdersPanel status={orderStatus} history={orderHistory} />}
+        <QualifyingList observers={observerList} />
       </main>
     </div>
   );
