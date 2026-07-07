@@ -3,8 +3,10 @@ import { ObserverManager } from './ObserverManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
 import { fetchHistoricalCandles, fetchClosedHourCandles } from '../services/historicalCandles';
 
-/** 19 closed candles + the live price = the 20-value Bollinger window (see utils/signals.ts). */
-const PRELOAD_CANDLES = 19;
+/** 200 closed candles per symbol per timeframe — backs both live signal
+ * detection (which only reads the tail it needs) and the 100-candle chart
+ * window with a full MA99 lookback (see observers/Observer.ts). */
+const PRELOAD_CANDLES = 200;
 
 export class BotManager {
   readonly symbolManager: SymbolManager;
