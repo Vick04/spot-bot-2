@@ -22,25 +22,3 @@ export function bollingerUpper(last20: number[]): number {
   variance /= last20.length;
   return mean + 2 * Math.sqrt(variance);
 }
-
-const MA99_PERIOD = 99;
-const MA20_PERIOD = 20;
-
-/**
- * 1h entry gate: given the last up-to-99 closed 1h closes (ascending), the gate
- * is open when the most recent close sits above both its MA99 and MA20 and below
- * its upper Bollinger band. Requires a full 99-close window; otherwise closed.
- */
-export function hourGateOpen(closes: number[]): boolean {
-  if (closes.length < MA99_PERIOD) return false;
-
-  const window99 = closes.slice(-MA99_PERIOD);
-  const window20 = closes.slice(-MA20_PERIOD);
-  const last = window99[window99.length - 1];
-
-  const ma99 = sma(window99);
-  const ma20 = sma(window20);
-  const bbUpper = bollingerUpper(window20);
-
-  return last > ma99 && last > ma20 && last < bbUpper;
-}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sma, bollingerUpper, hourGateOpen } from './indicators';
+import { sma, bollingerUpper } from './indicators';
 
 // Real window from history/BTCUSDT/BTCUSDT_1h.csv (row i=200): the 99 closes
 // ending at that candle, and the indicators the generator (download-history.js)
@@ -37,25 +37,4 @@ test('sma over last 20 closes matches CSV ma20', () => {
 
 test('bollingerUpper over last 20 closes matches CSV bb_up', () => {
   approx(bollingerUpper(CLOSES_99.slice(-20)), EXPECTED_BB_UP);
-});
-
-test('hourGateOpen is false when fewer than 99 closes (warmup)', () => {
-  assert.equal(hourGateOpen(CLOSES_99.slice(0, 98)), false);
-});
-
-test('hourGateOpen is true when last close > ma20, > ma99, and < bbUpper', () => {
-  const closes = CLOSES_99.slice();
-  closes[closes.length - 1] = 108800; // > ma20(108746.68), > ma99, < bb_up(109224.54)
-  assert.equal(hourGateOpen(closes), true);
-});
-
-test('hourGateOpen is false when last close <= ma20', () => {
-  // The real row's last close (108714.39) sits just below ma20 → gate closed.
-  assert.equal(hourGateOpen(CLOSES_99), false);
-});
-
-test('hourGateOpen is false when last close >= bbUpper (overextended)', () => {
-  const closes = CLOSES_99.slice();
-  closes[closes.length - 1] = 200000; // far above bbUpper
-  assert.equal(hourGateOpen(closes), false);
 });
