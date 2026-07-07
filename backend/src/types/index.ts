@@ -28,3 +28,34 @@ export interface ObserverState {
   qualifies: boolean;
   reasons: SignalReasons;
 }
+
+export type ChartTimeframe = '1m' | '1h';
+
+export interface ChartCandle {
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+export interface ChartSeriesPoint {
+  ma20: number | null;
+  ma99: number | null;
+  bbUpper: number | null;
+  bbLower: number | null;
+}
+
+export interface ChartSeries {
+  ma20: (number | null)[];
+  ma99: (number | null)[];
+  bbUpper: (number | null)[];
+  bbLower: (number | null)[];
+}
+
+export interface ChartData {
+  symbol: string;
+  timeframe: ChartTimeframe;
+  candles: ChartCandle[];
+  series: ChartSeries;
+}
