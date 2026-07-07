@@ -1,5 +1,5 @@
 import { useSocket } from './hooks/useSocket';
-import { QualifyingList } from './components/QualifyingList';
+import { ChartGrid } from './components/ChartGrid';
 
 export default function App() {
   const { observers, connected } = useSocket();
@@ -23,7 +23,7 @@ export default function App() {
       </header>
 
       <main className="px-6 py-6">
-        <QualifyingList observers={observerList} />
+        <ChartGrid observers={observerList} />
       </main>
     </div>
   );
