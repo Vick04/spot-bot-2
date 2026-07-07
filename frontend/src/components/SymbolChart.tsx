@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, CandlestickSeries, LineSeries, ISeriesApi, LineData, UTCTimestamp, WhitespaceData } from 'lightweight-charts';
+import { createChart, CandlestickSeries, IChartApi, LineSeries, ISeriesApi, LineData, UTCTimestamp, WhitespaceData } from 'lightweight-charts';
 import { ChartTimeframe } from '../types';
 import { useSymbolChartData } from '../hooks/useSymbolChartData';
 
@@ -8,19 +8,31 @@ interface Props {
   timeframe: ChartTimeframe;
 }
 
+/** The data buffer holds 100 candles, but the initial view zooms in to the
+ * most recent 20 for readability — the user can still scroll/zoom out. */
+const INITIAL_VISIBLE_CANDLES = 20;
+
 function toTime(openTimeMs: number): UTCTimestamp {
   return Math.floor(openTimeMs / 1000) as UTCTimestamp;
 }
 
 export function SymbolChart({ symbol, timeframe }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const ma20SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const ma99SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const bbUpperSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const bbLowerSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const hasSetInitialRangeRef = useRef(false);
 
   const { candles, series, loading, error } = useSymbolChartData(symbol, timeframe);
+
+  // A genuinely new dataset (symbol or timeframe change) should re-zoom to
+  // the most recent INITIAL_VISIBLE_CANDLES, same as a fresh mount.
+  useEffect(() => {
+    hasSetInitialRangeRef.current = false;
+  }, [symbol, timeframe]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -32,6 +44,7 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
       timeScale: { timeVisible: true },
     });
+    chartRef.current = chart;
 
     // 6 decimal places on the price axis — most of these symbols trade at
     // sub-$1 prices where the default 2-decimal format loses precision.
@@ -88,6 +101,13 @@ export function SymbolChart({ symbol, timeframe }: Props) {
     ma99SeriesRef.current?.setData(toLineData(series.ma99));
     bbUpperSeriesRef.current?.setData(toLineData(series.bbUpper));
     bbLowerSeriesRef.current?.setData(toLineData(series.bbLower));
+
+    if (!hasSetInitialRangeRef.current && chartRef.current) {
+      const total = candles.length;
+      const from = Math.max(0, total - INITIAL_VISIBLE_CANDLES);
+      chartRef.current.timeScale().setVisibleLogicalRange({ from, to: total - 1 });
+      hasSetInitialRangeRef.current = true;
+    }
   }, [candles, series]);
 
   return (

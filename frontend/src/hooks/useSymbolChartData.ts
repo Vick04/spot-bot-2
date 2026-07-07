@@ -10,7 +10,7 @@ interface ChartDataState {
 }
 
 const EMPTY_SERIES: ChartSeries = { ma20: [], ma99: [], bbUpper: [], bbLower: [] };
-export const VISIBLE_CANDLES = 50;
+export const VISIBLE_CANDLES = 100;
 
 /**
  * Merges an incoming chart point (from `chart:tick` or `chart:closed`) into the

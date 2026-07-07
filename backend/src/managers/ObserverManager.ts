@@ -12,9 +12,9 @@ import {
 import { computeChartSeries } from '../utils/chartSeries';
 
 /** REST/initial chart snapshots and the sliding client-side window both use
- * the last 50 candles; the Observer buffer (200 candles) holds more so
+ * the last 100 candles; the Observer buffer (200 candles) holds more so
  * MA99 has a full lookback at the first visible point. */
-const CHART_VISIBLE_CANDLES = 50;
+const CHART_VISIBLE_CANDLES = 100;
 
 export class ObserverManager extends EventEmitter {
   private observers: Map<string, Observer> = new Map();
@@ -82,7 +82,7 @@ export class ObserverManager extends EventEmitter {
     return this.getAllStates().filter(s => s.qualifies).map(s => s.symbol);
   }
 
-  /** Last 50 candles + index-aligned indicator series for `symbol`/`timeframe`.
+  /** Last 100 candles + index-aligned indicator series for `symbol`/`timeframe`.
    * Computes indicators over the FULL buffer first (so MA99 has its 99-candle
    * lookback), then slices both candles and series to the visible window. */
   getChartData(symbol: string, timeframe: ChartTimeframe): ChartData | null {
