@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, CandlestickSeries, LineSeries, LineStyle, ISeriesApi, UTCTimestamp } from 'lightweight-charts';
+import { createChart, CandlestickSeries, LineSeries, ISeriesApi, LineData, UTCTimestamp, WhitespaceData } from 'lightweight-charts';
 import { ChartTimeframe } from '../types';
 import { useSymbolChartData } from '../hooks/useSymbolChartData';
 
@@ -40,10 +40,10 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       wickUpColor: '#22c55e',
       wickDownColor: '#ef4444',
     });
-    ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#60a5fa', lineWidth: 1 });
-    ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#f97316', lineWidth: 1 });
-    bbUpperSeriesRef.current = chart.addSeries(LineSeries, { color: '#9ca3af', lineWidth: 1, lineStyle: LineStyle.Dashed });
-    bbLowerSeriesRef.current = chart.addSeries(LineSeries, { color: '#9ca3af', lineWidth: 1, lineStyle: LineStyle.Dashed });
+    ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#ecb619', lineWidth: 2 });
+    ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#FFF', lineWidth: 3 });
+    bbUpperSeriesRef.current = chart.addSeries(LineSeries, { color: '#b385f8', lineWidth: 2 });
+    bbLowerSeriesRef.current = chart.addSeries(LineSeries, { color: '#d63966', lineWidth: 2 });
 
     const handleResize = () => {
       if (containerRef.current) {
@@ -65,10 +65,15 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       candles.map(c => ({ time: toTime(c.openTime), open: c.open, high: c.high, low: c.low, close: c.close }))
     );
 
-    const toLineData = (values: (number | null)[]) =>
-      candles
-        .map((c, i) => ({ time: toTime(c.openTime), value: values[i] }))
-        .filter((point): point is { time: UTCTimestamp; value: number } => point.value !== null);
+    // Points with no computed value become whitespace (a gap) instead of
+    // being filtered out — filtering would make lightweight-charts draw a
+    // straight line connecting the nearest valid points across the gap.
+    const toLineData = (values: (number | null)[]): (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>)[] =>
+      candles.map((c, i) => {
+        const time = toTime(c.openTime);
+        const value = values[i];
+        return value === null ? { time } : { time, value };
+      });
 
     ma20SeriesRef.current?.setData(toLineData(series.ma20));
     ma99SeriesRef.current?.setData(toLineData(series.ma99));
