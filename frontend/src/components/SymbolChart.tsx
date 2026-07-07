@@ -33,21 +33,26 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       timeScale: { timeVisible: true },
     });
 
+    // 6 decimal places on the price axis — most of these symbols trade at
+    // sub-$1 prices where the default 2-decimal format loses precision.
+    const priceFormat = { type: 'price' as const, precision: 6, minMove: 0.000001 };
+
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
       upColor: '#22c55e',
       downColor: '#ef4444',
       borderVisible: false,
       wickUpColor: '#22c55e',
       wickDownColor: '#ef4444',
+      priceFormat,
     });
     // priceLineVisible/lastValueVisible off: these draw a dashed straight
     // line + value label at the series' latest value, which doesn't follow
     // history — out of place alongside the historical overlay lines.
     const noPriceLine = { priceLineVisible: false, lastValueVisible: false };
-    ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#ecb619', lineWidth: 2, ...noPriceLine });
-    ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#FFF', lineWidth: 3, ...noPriceLine });
-    bbUpperSeriesRef.current = chart.addSeries(LineSeries, { color: '#b385f8', lineWidth: 2, ...noPriceLine });
-    bbLowerSeriesRef.current = chart.addSeries(LineSeries, { color: '#d63966', lineWidth: 2, ...noPriceLine });
+    ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#ecb619', lineWidth: 2, priceFormat, ...noPriceLine });
+    ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#FFF', lineWidth: 3, priceFormat, ...noPriceLine });
+    bbUpperSeriesRef.current = chart.addSeries(LineSeries, { color: '#b385f8', lineWidth: 2, priceFormat, ...noPriceLine });
+    bbLowerSeriesRef.current = chart.addSeries(LineSeries, { color: '#d63966', lineWidth: 2, priceFormat, ...noPriceLine });
 
     const handleResize = () => {
       if (containerRef.current) {

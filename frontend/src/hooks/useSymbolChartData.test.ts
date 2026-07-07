@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeChartPoint } from './useSymbolChartData';
+import { mergeChartPoint, VISIBLE_CANDLES } from './useSymbolChartData';
 import { ChartCandle, ChartSeries, ChartSeriesPoint } from '../types';
-
-const VISIBLE_CANDLES = 100;
 
 function makeCandle(openTime: number): ChartCandle {
   return { openTime, open: 1, high: 2, low: 0.5, close: 1.5 };
@@ -68,9 +66,10 @@ test('a closed event with the same openTime as the last point (tick-then-closed 
   assert.equal(result.candles[1].close, 4);
 });
 
-test('the result never exceeds VISIBLE_CANDLES (100) length regardless of how many merges are applied', () => {
+test('the result never exceeds VISIBLE_CANDLES length regardless of how many merges are applied', () => {
+  const totalPushed = VISIBLE_CANDLES + 200;
   let s: { candles: ChartCandle[]; series: ChartSeries } = { candles: [], series: emptySeries() };
-  for (let i = 0; i < 250; i++) {
+  for (let i = 0; i < totalPushed; i++) {
     s = mergeChartPoint(s, { candle: makeCandle(i * 1000), series: makeSeriesPoint() });
   }
   assert.equal(s.candles.length, VISIBLE_CANDLES);
@@ -78,9 +77,10 @@ test('the result never exceeds VISIBLE_CANDLES (100) length regardless of how ma
   assert.equal(s.series.ma99.length, VISIBLE_CANDLES);
   assert.equal(s.series.bbUpper.length, VISIBLE_CANDLES);
   assert.equal(s.series.bbLower.length, VISIBLE_CANDLES);
-  // Should hold the most recent 100 openTimes, i.e. i = 150..249
-  assert.equal(s.candles[0].openTime, 150 * 1000);
-  assert.equal(s.candles[VISIBLE_CANDLES - 1].openTime, 249 * 1000);
+  // Should hold the most recent VISIBLE_CANDLES openTimes.
+  const firstKeptIndex = totalPushed - VISIBLE_CANDLES;
+  assert.equal(s.candles[0].openTime, firstKeptIndex * 1000);
+  assert.equal(s.candles[VISIBLE_CANDLES - 1].openTime, (totalPushed - 1) * 1000);
 });
 
 test('regression: close candle T, then tick for T+1 results in [..., T, T+1], not [..., T+1] alone', () => {
