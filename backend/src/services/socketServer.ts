@@ -1,62 +1,22 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIO } from 'socket.io';
 import { ObserverManager } from '../managers/ObserverManager';
-import { TopSymbolsManager } from '../managers/TopSymbolsManager';
-import { OrderManager } from '../managers/OrderManager';
-import { ActiveOrder, CompletedOrder } from '../types';
+import { ObserverState } from '../types';
 
-export function createSocketServer(
-  httpServer: HttpServer,
-  observerManager: ObserverManager,
-  topSymbolsManager: TopSymbolsManager,
-  orderManager: OrderManager,
-): void {
+export function createSocketServer(httpServer: HttpServer, observerManager: ObserverManager): void {
   const io = new SocketIO(httpServer, { cors: { origin: '*' } });
 
   io.on('connection', (socket) => {
     console.log(`[WS] Client connected: ${socket.id}`);
 
-    socket.emit('snapshot', {
-      observers: observerManager.getAllStates(),
-      top25: topSymbolsManager.getTop25(),
-      orderStatus: orderManager.getStatus(),
-      orderHistory: orderManager.getHistory(),
-    });
+    socket.emit('snapshot', { observers: observerManager.getAllStates() });
 
     socket.on('disconnect', () => {
       console.log(`[WS] Client disconnected: ${socket.id}`);
     });
   });
 
-  observerManager.on('reset', () => {
-    io.emit('snapshot', {
-      observers: observerManager.getAllStates(),
-      top25: topSymbolsManager.getTop25(),
-      orderStatus: orderManager.getStatus(),
-      orderHistory: orderManager.getHistory(),
-    });
-  });
-
-  observerManager.on('candle', ({ symbol, state }) => {
-    io.emit('candle', { symbol, state });
-  });
-
-  observerManager.on('hit', () => {
-    io.emit('top25', topSymbolsManager.getTop25());
-  });
-
-  orderManager.on('toggle', () => {
-    io.emit('order:status', orderManager.getStatus());
-  });
-
-  orderManager.on('buy', (order: ActiveOrder) => {
-    io.emit('order:status', orderManager.getStatus());
-    io.emit('order:buy', order);
-  });
-
-  orderManager.on('sell', (completed: CompletedOrder) => {
-    io.emit('order:status', orderManager.getStatus());
-    io.emit('order:sell', completed);
-    io.emit('order:history', orderManager.getHistory());
+  observerManager.on('signal', (state: ObserverState) => {
+    io.emit('signal', state);
   });
 }
