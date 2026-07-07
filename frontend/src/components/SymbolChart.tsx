@@ -40,10 +40,14 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       wickUpColor: '#22c55e',
       wickDownColor: '#ef4444',
     });
-    ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#ecb619', lineWidth: 2 });
-    ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#FFF', lineWidth: 3 });
-    bbUpperSeriesRef.current = chart.addSeries(LineSeries, { color: '#b385f8', lineWidth: 2 });
-    bbLowerSeriesRef.current = chart.addSeries(LineSeries, { color: '#d63966', lineWidth: 2 });
+    // priceLineVisible/lastValueVisible off: these draw a dashed straight
+    // line + value label at the series' latest value, which doesn't follow
+    // history — out of place alongside the historical overlay lines.
+    const noPriceLine = { priceLineVisible: false, lastValueVisible: false };
+    ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#ecb619', lineWidth: 2, ...noPriceLine });
+    ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#FFF', lineWidth: 3, ...noPriceLine });
+    bbUpperSeriesRef.current = chart.addSeries(LineSeries, { color: '#b385f8', lineWidth: 2, ...noPriceLine });
+    bbLowerSeriesRef.current = chart.addSeries(LineSeries, { color: '#d63966', lineWidth: 2, ...noPriceLine });
 
     const handleResize = () => {
       if (containerRef.current) {
