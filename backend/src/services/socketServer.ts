@@ -19,4 +19,12 @@ export function createSocketServer(httpServer: HttpServer, observerManager: Obse
   observerManager.on('signal', (state: ObserverState) => {
     io.emit('signal', state);
   });
+
+  observerManager.on('chart:tick', (payload) => {
+    io.emit('chart:tick', payload);
+  });
+
+  observerManager.on('chart:closed', (payload) => {
+    io.emit('chart:closed', payload);
+  });
 }

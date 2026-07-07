@@ -25,6 +25,24 @@ export function createRouter(bot: BotManager): Router {
     res.json({ data: state });
   });
 
+  router.get('/observers/:symbol/chart', (req: Request, res: Response) => {
+    const symbol = req.params.symbol.toUpperCase();
+    const timeframe = req.query.timeframe;
+
+    if (timeframe !== '1m' && timeframe !== '1h') {
+      res.status(400).json({ error: `timeframe must be '1m' or '1h'` });
+      return;
+    }
+
+    const data = bot.observerManager.getChartData(symbol, timeframe);
+    if (!data) {
+      res.status(404).json({ error: `Symbol ${symbol} not found` });
+      return;
+    }
+
+    res.json({ data });
+  });
+
   router.get('/qualifying', (_req: Request, res: Response) => {
     res.json({ data: bot.observerManager.getQualifyingSymbols() });
   });
