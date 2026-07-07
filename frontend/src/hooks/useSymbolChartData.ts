@@ -61,12 +61,20 @@ export function useSymbolChartData(symbol: string, timeframe: ChartTimeframe): C
       if (event.symbol !== symbol || event.timeframe !== timeframe) return;
 
       setState(s => {
-        const candles = s.candles.concat(event.candle).slice(-VISIBLE_CANDLES);
+        // chart:tick may have already placed this exact closing candle as the
+        // last element (see ObserverManager.updateCandle, which emits
+        // chart:tick then chart:closed for the same candle). If so, replace
+        // that element in place instead of appending a duplicate openTime.
+        const lastCandle = s.candles[s.candles.length - 1];
+        const isReplacingLast = lastCandle !== undefined && lastCandle.openTime === event.candle.openTime;
+        const dropLast = <T,>(arr: T[]) => (isReplacingLast ? arr.slice(0, -1) : arr);
+
+        const candles = dropLast(s.candles).concat(event.candle).slice(-VISIBLE_CANDLES);
         const series: ChartSeries = {
-          ma20: s.series.ma20.concat(event.series.ma20).slice(-VISIBLE_CANDLES),
-          ma99: s.series.ma99.concat(event.series.ma99).slice(-VISIBLE_CANDLES),
-          bbUpper: s.series.bbUpper.concat(event.series.bbUpper).slice(-VISIBLE_CANDLES),
-          bbLower: s.series.bbLower.concat(event.series.bbLower).slice(-VISIBLE_CANDLES),
+          ma20: dropLast(s.series.ma20).concat(event.series.ma20).slice(-VISIBLE_CANDLES),
+          ma99: dropLast(s.series.ma99).concat(event.series.ma99).slice(-VISIBLE_CANDLES),
+          bbUpper: dropLast(s.series.bbUpper).concat(event.series.bbUpper).slice(-VISIBLE_CANDLES),
+          bbLower: dropLast(s.series.bbLower).concat(event.series.bbLower).slice(-VISIBLE_CANDLES),
         };
         return { ...s, candles, series };
       });
