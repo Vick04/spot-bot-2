@@ -8,13 +8,26 @@ interface Props {
 
 const TIMEFRAMES: ChartTimeframe[] = ['1m', '1h'];
 
+/** All symbols in this app are USDT pairs (e.g. "BTCUSDT" -> "BTC_USDT"). */
+function binanceSpotUrl(symbol: string): string {
+  const base = symbol.slice(0, -4);
+  return `https://www.binance.com/es-AR/trade/${base}_USDT?type=spot`;
+}
+
 export function SymbolChartCard({ symbol }: Props) {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('1m');
 
   return (
     <div className="rounded border border-gray-800 bg-gray-900 p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-mono text-sm text-yellow-400">{symbol}</span>
+        <a
+          href={binanceSpotUrl(symbol)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-sm text-yellow-400 hover:underline"
+        >
+          {symbol}
+        </a>
         <div className="flex rounded overflow-hidden border border-gray-700">
           {TIMEFRAMES.map(tf => (
             <button
