@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useState } from 'react';
 import { ObserverData } from '../types';
-
-const SOCKET_URL = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+import { getSocket } from './socket';
 
 interface SocketStore {
   observers: Map<string, ObserverData>;
@@ -15,28 +13,35 @@ export function useSocket() {
     connected: false,
   });
 
-  const socketRef = useRef<Socket | null>(null);
-
   useEffect(() => {
-    const socket = io(SOCKET_URL, { transports: ['websocket'] });
-    socketRef.current = socket;
+    const socket = getSocket();
 
-    socket.on('connect', () => setStore(s => ({ ...s, connected: true })));
-    socket.on('disconnect', () => setStore(s => ({ ...s, connected: false })));
-
-    socket.on('snapshot', ({ observers }: { observers: ObserverData[] }) => {
+    const handleConnect = () => setStore(s => ({ ...s, connected: true }));
+    const handleDisconnect = () => setStore(s => ({ ...s, connected: false }));
+    const handleSnapshot = ({ observers }: { observers: ObserverData[] }) => {
       setStore(s => ({ ...s, observers: new Map(observers.map(o => [o.symbol, o])) }));
-    });
-
-    socket.on('signal', (state: ObserverData) => {
+    };
+    const handleSignal = (state: ObserverData) => {
       setStore(s => {
         const next = new Map(s.observers);
         next.set(state.symbol, state);
         return { ...s, observers: next };
       });
-    });
+    };
 
-    return () => { socket.disconnect(); };
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('snapshot', handleSnapshot);
+    socket.on('signal', handleSignal);
+
+    if (socket.connected) handleConnect();
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('snapshot', handleSnapshot);
+      socket.off('signal', handleSignal);
+    };
   }, []);
 
   return store;
