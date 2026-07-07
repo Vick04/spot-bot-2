@@ -19,8 +19,6 @@ export interface CandleData {
 export interface SignalReasons {
   bbUpper1m: boolean;
   bbUpper1h: boolean;
-  threePositive1m: boolean;
-  threePositive1h: boolean;
 }
 
 export interface ObserverState {

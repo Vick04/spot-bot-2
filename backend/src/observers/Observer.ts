@@ -11,7 +11,7 @@ const CHART_HISTORY_CANDLES = 200;
 
 const EMPTY_SIGNAL: SignalResult = {
   qualifies: false,
-  reasons: { bbUpper1m: false, bbUpper1h: false, threePositive1m: false, threePositive1h: false },
+  reasons: { bbUpper1m: false, bbUpper1h: false },
 };
 
 export class Observer {
@@ -96,12 +96,6 @@ export class Observer {
 
   private recompute(): void {
     if (this.currentPrice === null) return;
-    this.signal = detectSignal(
-      this.currentPrice,
-      this.closed1m.toArray(),
-      this.form1mCandle?.open ?? null,
-      this.closed1h.toArray(),
-      this.form1hCandle?.open ?? null,
-    );
+    this.signal = detectSignal(this.currentPrice, this.closed1m.toArray(), this.closed1h.toArray());
   }
 }

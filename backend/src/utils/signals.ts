@@ -22,30 +22,18 @@ function bbUpperCondition(price: number, closed: CandleOC[]): boolean {
   return price > bollingerUpper([...closes, price]);
 }
 
-/** True when the in-formation candle and the 2 closed candles before it are all positive. */
-function threePositiveCondition(price: number, formOpen: number | null, closed: CandleOC[]): boolean {
-  if (formOpen === null || closed.length < 2) return false;
-  if (!(price > formOpen)) return false;
-  const [prev2, prev1] = closed.slice(-2);
-  return prev1.close > prev1.open && prev2.close > prev2.open;
-}
-
 export function detectSignal(
   price: number,
   closed1m: CandleOC[],
-  form1mOpen: number | null,
   closed1h: CandleOC[],
-  form1hOpen: number | null,
 ): SignalResult {
   const reasons: SignalReasons = {
     bbUpper1m: bbUpperCondition(price, closed1m),
     bbUpper1h: bbUpperCondition(price, closed1h),
-    threePositive1m: threePositiveCondition(price, form1mOpen, closed1m),
-    threePositive1h: threePositiveCondition(price, form1hOpen, closed1h),
   };
 
   return {
-    qualifies: reasons.bbUpper1m || reasons.bbUpper1h || reasons.threePositive1m || reasons.threePositive1h,
+    qualifies: reasons.bbUpper1m || reasons.bbUpper1h,
     reasons,
   };
 }
