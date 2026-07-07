@@ -11,14 +11,26 @@ export function sma(values: number[]): number {
   return sum / values.length;
 }
 
-/** Upper Bollinger band: sma(last20) + 2 * populationStdDev(last20). */
-export function bollingerUpper(last20: number[]): number {
-  const mean = sma(last20);
+export interface BollingerBands {
+  middle: number;
+  upper: number;
+  lower: number;
+}
+
+/** Bollinger bands: sma(values) ± 2 * populationStdDev(values). */
+export function bollingerBands(values: number[]): BollingerBands {
+  const mean = sma(values);
   let variance = 0;
-  for (const v of last20) {
+  for (const v of values) {
     const d = v - mean;
     variance += d * d;
   }
-  variance /= last20.length;
-  return mean + 2 * Math.sqrt(variance);
+  variance /= values.length;
+  const stddev = Math.sqrt(variance);
+  return { middle: mean, upper: mean + 2 * stddev, lower: mean - 2 * stddev };
+}
+
+/** Upper Bollinger band: sma(last20) + 2 * populationStdDev(last20). */
+export function bollingerUpper(last20: number[]): number {
+  return bollingerBands(last20).upper;
 }

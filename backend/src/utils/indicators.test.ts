@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sma, bollingerUpper } from './indicators';
+import { sma, bollingerUpper, bollingerBands } from './indicators';
 
 // Real window from history/BTCUSDT/BTCUSDT_1h.csv (row i=200): the 99 closes
 // ending at that candle, and the indicators the generator (download-history.js)
@@ -37,4 +37,17 @@ test('sma over last 20 closes matches CSV ma20', () => {
 
 test('bollingerUpper over last 20 closes matches CSV bb_up', () => {
   approx(bollingerUpper(CLOSES_99.slice(-20)), EXPECTED_BB_UP);
+});
+
+test('bollingerBands over last 20 closes matches ma20/bb_up, and bb_low is symmetric around ma20', () => {
+  const bands = bollingerBands(CLOSES_99.slice(-20));
+  approx(bands.middle, EXPECTED_MA20);
+  approx(bands.upper, EXPECTED_BB_UP);
+  const expectedLower = EXPECTED_MA20 - (EXPECTED_BB_UP - EXPECTED_MA20);
+  approx(bands.lower, expectedLower);
+});
+
+test('bollingerUpper still matches bollingerBands().upper (refactor did not change behavior)', () => {
+  const window = CLOSES_99.slice(-20);
+  assert.equal(bollingerUpper(window), bollingerBands(window).upper);
 });
