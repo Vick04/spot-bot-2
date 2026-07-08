@@ -81,3 +81,68 @@ test('getCurrentPrice reflects the latest 1s close, null before any tick', () =>
   observer.updateCandle1s({ symbol: 'BTCUSDT', timeframe: '1s', openTime: 1, open: 10, high: 10, low: 10, close: 12.5, isClosed: true });
   assert.equal(observer.getCurrentPrice(), 12.5);
 });
+
+function closedCandleAt(openTime: number, close: number): Candle {
+  return { symbol: 'BTCUSDT', timeframe: '1m', openTime, open: close, high: close, low: close, close, isClosed: true };
+}
+
+/** 20-candle window: 10 closes at 90, 9 closes at 100, then `last`, with
+ * ascending openTime starting at `startAt`. Mirrors the window shape used
+ * in signals.test.ts (see that file's comment for why a two-cluster shape
+ * is needed): last=70 crosses step1 (<= lower) without reset; a further
+ * single close of 100 right after crosses step2 (>= middle) without reset
+ * (verified with a throwaway script computing bollingerBands() over the
+ * resulting sliding windows). */
+function stepWindow(startAt: number, last: number): Candle[] {
+  const closes = Array(10).fill(90).concat(Array(9).fill(100)).concat([last]);
+  return closes.map((close, i) => closedCandleAt(startAt + i, close));
+}
+
+test('updateCandle1s never changes signal state, only currentPrice', () => {
+  const observer = new Observer('BTCUSDT');
+  const before = observer.getState().reasons;
+  observer.updateCandle1s({ symbol: 'BTCUSDT', timeframe: '1s', openTime: 1, open: 999999, high: 999999, low: 999999, close: 999999, isClosed: true });
+  assert.deepEqual(observer.getState().reasons, before);
+  assert.equal(observer.getCurrentPrice(), 999999);
+});
+
+test('a live (non-closed) 1m candle does not advance the 1m state machine', () => {
+  const observer = new Observer('BTCUSDT');
+  const candles19 = Array.from({ length: 19 }, (_, i) => closedCandleAt(i, 100 + i));
+  observer.preloadClosed1m(candles19);
+  const before = observer.getState().reasons.m1;
+  observer.updateCandle1m(formingCandle(20, 50, 50, 50, 50));
+  assert.deepEqual(observer.getState().reasons.m1, before);
+});
+
+test('preloadClosed1m replays the state machine so restart reconstructs true state (reaches step1)', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1m(stepWindow(0, 70));
+  const reasons = observer.getState().reasons;
+  assert.equal(reasons.m1.step1, true);
+  assert.equal(reasons.m1.step2, false);
+  assert.equal(reasons.h1.step1, false);
+  assert.equal(observer.getState().qualifies, true);
+});
+
+test('preloadClosed1h replays independently from preloadClosed1m', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1h(stepWindow(0, 70));
+  const reasons = observer.getState().reasons;
+  assert.equal(reasons.h1.step1, true);
+  assert.equal(reasons.m1.step1, false);
+});
+
+test('a live closed 1m candle after preload continues the replayed state (reaches step2)', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1m(stepWindow(0, 70));
+  assert.equal(observer.getState().reasons.m1.step1, true);
+
+  // One more close (openTime 20, close 100) slides the 20-window forward
+  // by one and crosses the middle band without crossing the upper band.
+  observer.updateCandle1m(closedCandleAt(20, 100));
+
+  const reasons = observer.getState().reasons;
+  assert.equal(reasons.m1.step1, true);
+  assert.equal(reasons.m1.step2, true);
+});
