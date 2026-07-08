@@ -7,6 +7,7 @@ interface Props {
   symbol: string;
   isPinned: boolean;
   onTogglePin: () => void;
+  isReady: boolean;
   activeOrder: ActiveOrder | null;
   orderSize: number;
   onBuy: () => void;
@@ -25,7 +26,7 @@ function fmtPrice(value: number): string {
   return value.toFixed(6);
 }
 
-export function SymbolChartCard({ symbol, isPinned, onTogglePin, activeOrder, orderSize, onBuy }: Props) {
+export function SymbolChartCard({ symbol, isPinned, onTogglePin, isReady, activeOrder, orderSize, onBuy }: Props) {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('1m');
   const { candles, series, loading, error } = useSymbolChartData(symbol, timeframe);
 
@@ -56,6 +57,11 @@ export function SymbolChartCard({ symbol, isPinned, onTogglePin, activeOrder, or
           >
             {symbol}
           </a>
+          {isReady && (
+            <span className="shrink-0 px-1 py-0.5 rounded text-[10px] font-mono font-bold bg-green-900 text-green-400">
+              READY
+            </span>
+          )}
         </div>
         <div className="flex rounded overflow-hidden border border-gray-700">
           {TIMEFRAMES.map(tf => (
