@@ -16,6 +16,7 @@ interface BinanceKlineEvent {
     h: string;
     l: string;
     c: string;
+    q: string;
     i: string;
     x: boolean;
   };
@@ -82,6 +83,7 @@ export class BinanceWebSocket extends EventEmitter {
       high: parseFloat(k.h),
       low: parseFloat(k.l),
       close: parseFloat(k.c),
+      quoteVolume: parseFloat(k.q),
       isClosed: k.x,
     };
 
