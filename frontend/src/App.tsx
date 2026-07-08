@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { useSocket } from './hooks/useSocket';
 import { ChartGrid } from './components/ChartGrid';
+import { OrdersView } from './components/OrdersView';
+
+type Tab = 'charts' | 'orders';
 
 export default function App() {
   const { observers, connected } = useSocket();
+  const [tab, setTab] = useState<Tab>('charts');
   const observerList = Array.from(observers.values());
   const qualifyingCount = observerList.filter(o => o.qualifies).length;
 
@@ -22,8 +27,23 @@ export default function App() {
         </div>
       </header>
 
+      <div className="px-6 pt-4 flex gap-2">
+        <button
+          onClick={() => setTab('charts')}
+          className={`px-3 py-1.5 text-sm rounded ${tab === 'charts' ? 'bg-yellow-400 text-black' : 'bg-gray-900 text-gray-400'}`}
+        >
+          Charts
+        </button>
+        <button
+          onClick={() => setTab('orders')}
+          className={`px-3 py-1.5 text-sm rounded ${tab === 'orders' ? 'bg-yellow-400 text-black' : 'bg-gray-900 text-gray-400'}`}
+        >
+          Active Orders
+        </button>
+      </div>
+
       <main className="px-6 py-6">
-        <ChartGrid observers={observerList} />
+        {tab === 'charts' ? <ChartGrid observers={observerList} /> : <OrdersView />}
       </main>
     </div>
   );
