@@ -51,3 +51,33 @@ test('getChartData returns the 1h buffer independently from the 1m buffer', () =
   assert.equal(observer.getChartData('1h').length, 1);
   assert.equal(observer.getChartData('1h')[0].open, 200);
 });
+
+test('get24hQuoteVolume sums preloaded quote volumes', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadQuoteVolume1m([
+    { symbol: 'BTCUSDT', timeframe: '1m', openTime: 1, open: 1, high: 1, low: 1, close: 1, isClosed: true, quoteVolume: 100 },
+    { symbol: 'BTCUSDT', timeframe: '1m', openTime: 2, open: 1, high: 1, low: 1, close: 1, isClosed: true, quoteVolume: 250 },
+  ]);
+  assert.equal(observer.get24hQuoteVolume(), 350);
+});
+
+test('get24hQuoteVolume treats a missing quoteVolume as 0', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadQuoteVolume1m([
+    { symbol: 'BTCUSDT', timeframe: '1m', openTime: 1, open: 1, high: 1, low: 1, close: 1, isClosed: true },
+  ]);
+  assert.equal(observer.get24hQuoteVolume(), 0);
+});
+
+test('a closed 1m candle updates the rolling quote-volume window in real time', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.updateCandle1m({ symbol: 'BTCUSDT', timeframe: '1m', openTime: 1, open: 1, high: 1, low: 1, close: 1, isClosed: true, quoteVolume: 500 });
+  assert.equal(observer.get24hQuoteVolume(), 500);
+});
+
+test('getCurrentPrice reflects the latest 1s close, null before any tick', () => {
+  const observer = new Observer('BTCUSDT');
+  assert.equal(observer.getCurrentPrice(), null);
+  observer.updateCandle1s({ symbol: 'BTCUSDT', timeframe: '1s', openTime: 1, open: 10, high: 10, low: 10, close: 12.5, isClosed: true });
+  assert.equal(observer.getCurrentPrice(), 12.5);
+});
