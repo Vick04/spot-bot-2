@@ -22,11 +22,11 @@ export function OrdersView() {
   return (
     <div>
       <div className="mb-4 text-sm text-gray-400 font-mono">
-        {completedCount} completadas —{' '}
+        {completedCount} completed —{' '}
         <span className={totalProfitPct >= 0 ? 'text-green-400' : 'text-red-400'}>
           {totalProfitPct.toFixed(3)}%
         </span>{' '}
-        rendimiento — saldo: <span className="text-gray-200">{balance.toFixed(2)} USDT</span>
+        performance — balance: <span className="text-gray-200">{balance.toFixed(2)} USDT</span>
       </div>
 
       {activeOrders.length === 0 ? (
