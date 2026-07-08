@@ -1,39 +1,37 @@
-import { SignalReasons } from '../types';
-import { bollingerUpper } from './indicators';
-
-export interface SignalResult {
-  qualifies: boolean;
-  reasons: SignalReasons;
-}
+import { TimeframeSignal } from '../types';
+import { bollingerBands } from './indicators';
 
 interface CandleOC {
   open: number;
   close: number;
 }
 
-/** 19 closed candles + the live price = a 20-value Bollinger window. */
-const CLOSED_WINDOW = 19;
+const WINDOW = 20;
 
-/** True when the live price exceeds the Bollinger upper band recomputed with
- * the live price standing in as the 20th (most recent) value. */
-function bbUpperCondition(price: number, closed: CandleOC[]): boolean {
-  if (closed.length < CLOSED_WINDOW) return false;
-  const closes = closed.slice(-CLOSED_WINDOW).map(c => c.close);
-  return price > bollingerUpper([...closes, price]);
-}
+export const EMPTY_TIMEFRAME_SIGNAL: TimeframeSignal = { step1: false, step2: false };
 
-export function detectSignal(
-  price: number,
-  closed1m: CandleOC[],
-  closed1h: CandleOC[],
-): SignalResult {
-  const reasons: SignalReasons = {
-    bbUpper1m: bbUpperCondition(price, closed1m),
-    bbUpper1h: bbUpperCondition(price, closed1h),
-  };
+/** Advances one timeframe's sticky step1/step2 state using the trailing
+ * WINDOW closed candles (last element is the just-closed candle, itself
+ * included in the Bollinger/SMA window). Fewer than WINDOW candles is a
+ * no-op — returns prev unchanged.
+ *
+ * Reset (close >= upper band) is checked first and wins over step1/step2
+ * on the same close. Otherwise: step1 sets on close <= lower band (only if
+ * not already true); step2 sets on close >= middle band, but only once
+ * step1 is already true. */
+export function nextTimeframeSignal(closed: CandleOC[], prev: TimeframeSignal): TimeframeSignal {
+  if (closed.length < WINDOW) return prev;
 
-  return {
-    qualifies: reasons.bbUpper1m || reasons.bbUpper1h,
-    reasons,
-  };
+  const window = closed.slice(-WINDOW).map(c => c.close);
+  const { upper, lower, middle } = bollingerBands(window);
+  const lastClose = closed[closed.length - 1].close;
+
+  if (lastClose >= upper) {
+    return { step1: false, step2: false };
+  }
+
+  let { step1, step2 } = prev;
+  if (!step1 && lastClose <= lower) step1 = true;
+  if (step1 && !step2 && lastClose >= middle) step2 = true;
+  return { step1, step2 };
 }

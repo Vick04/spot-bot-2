@@ -1,59 +1,81 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectSignal } from './signals';
-import { bollingerUpper } from './indicators';
+import { nextTimeframeSignal, EMPTY_TIMEFRAME_SIGNAL } from './signals';
 
-function candle(open: number, close: number) {
-  return { open, close };
+function candle(close: number) {
+  return { open: close, close };
 }
 
-// 19 closed 1m candles, increasing closes 100..118 (open == close: irrelevant to bbUpper checks).
-const CLOSED_19 = Array.from({ length: 19 }, (_, i) => candle(100 + i, 100 + i));
-const CLOSED_18 = CLOSED_19.slice(0, 18);
+/** 20-candle window: 10 closes at 90, 9 closes at 100, then `last`. Two
+ * clusters give the band enough width that `last` can land strictly
+ * between the middle and upper bands (unlike a flat baseline + single
+ * outlier, where any deviation large enough to cross the middle band also
+ * breaches the upper band, making step2-without-reset unreachable). Exact
+ * band values for each `last` used below were verified with a throwaway
+ * script computing bollingerBands() over these exact arrays:
+ *   last=70  -> step1 crosses (<= lower), step2 doesn't, no reset
+ *   last=90  -> inside the band (no step1, no step2, no reset)
+ *   last=100 -> step2 crosses (>= middle), no reset
+ *   last=108 -> step2 crosses AND reset crosses (>= upper) simultaneously
+ *   last=110 -> reset crosses (>= upper) */
+function window(last: number): { open: number; close: number }[] {
+  return Array(10).fill(90).concat(Array(9).fill(100)).concat([last]).map(candle);
+}
 
-test('bbUpper1m is true when live price exceeds the recomputed live band', () => {
-  const price = 500;
-  const expectedBbUpper = bollingerUpper([...CLOSED_19.map(c => c.close), price]);
-  assert.ok(price > expectedBbUpper, 'test setup: price must exceed the band');
-
-  const result = detectSignal(price, CLOSED_19, []);
-  assert.equal(result.reasons.bbUpper1m, true);
-  assert.equal(result.qualifies, true);
+test('below WINDOW candles is a no-op, returns prev unchanged', () => {
+  const nineteen = window(70).slice(0, 19);
+  const prev = { step1: true, step2: true };
+  const result = nextTimeframeSignal(nineteen, prev);
+  assert.deepEqual(result, prev);
 });
 
-test('bbUpper1m is false when live price sits inside the recomputed live band', () => {
-  const price = 100.001; // near the bottom of an increasing sequence's band
-  const result = detectSignal(price, CLOSED_19, []);
-  assert.equal(result.reasons.bbUpper1m, false);
+test('step1 sets when the closed candle is <= the lower band, from empty state', () => {
+  const result = nextTimeframeSignal(window(70), EMPTY_TIMEFRAME_SIGNAL);
+  assert.equal(result.step1, true);
+  assert.equal(result.step2, false);
 });
 
-test('the live band recomputes per tick — same closed candles, different price flips the result', () => {
-  const low = detectSignal(100.001, CLOSED_19, []);
-  const high = detectSignal(500, CLOSED_19, []);
-  assert.equal(low.reasons.bbUpper1m, false);
-  assert.equal(high.reasons.bbUpper1m, true);
+test('step1 does not set when the closed candle sits inside the band', () => {
+  const result = nextTimeframeSignal(window(90), EMPTY_TIMEFRAME_SIGNAL);
+  assert.equal(result.step1, false);
 });
 
-test('bbUpper1m is false with fewer than 19 closed candles, regardless of price', () => {
-  const result = detectSignal(1_000_000, CLOSED_18, []);
-  assert.equal(result.reasons.bbUpper1m, false);
+test('step2 requires step1 already true — a mid-band close with step1 false stays false', () => {
+  const result = nextTimeframeSignal(window(100), { step1: false, step2: false });
+  assert.equal(result.step2, false);
 });
 
-test('bbUpper1h mirrors bbUpper1m independently using the 1h series', () => {
-  const result = detectSignal(100.001, [], CLOSED_19);
-  assert.equal(result.reasons.bbUpper1m, false);
-  assert.equal(result.reasons.bbUpper1h, false);
-
-  const result2 = detectSignal(500, [], CLOSED_19);
-  assert.equal(result2.reasons.bbUpper1h, true);
+test('step2 sets when step1 is true and the closed candle is >= the middle band', () => {
+  const result = nextTimeframeSignal(window(100), { step1: true, step2: false });
+  assert.equal(result.step1, true);
+  assert.equal(result.step2, true);
 });
 
-test('qualifies is the OR of both reasons — false when neither holds, true when exactly one holds', () => {
-  const none = detectSignal(100.001, CLOSED_19, CLOSED_19);
-  assert.equal(none.qualifies, false);
+test('step2 does not set when step1 is true but the close stays below the middle band', () => {
+  const result = nextTimeframeSignal(window(90), { step1: true, step2: false });
+  assert.equal(result.step2, false);
+});
 
-  const onlyOne = detectSignal(500, CLOSED_19, []);
-  assert.equal(onlyOne.reasons.bbUpper1m, true);
-  assert.equal(onlyOne.reasons.bbUpper1h, false);
-  assert.equal(onlyOne.qualifies, true);
+test('reset clears both steps when the closed candle is >= the upper band', () => {
+  const result = nextTimeframeSignal(window(110), { step1: true, step2: true });
+  assert.deepEqual(result, { step1: false, step2: false });
+});
+
+test('reset wins even if the same close would also satisfy the step2 condition', () => {
+  // last=108 crosses both the middle band (step2-eligible) and the upper
+  // band (reset-eligible) at once — reset must take priority.
+  const result = nextTimeframeSignal(window(108), { step1: true, step2: false });
+  assert.deepEqual(result, { step1: false, step2: false });
+});
+
+test('once step2 is true, further mid-band closes leave state unchanged', () => {
+  const result = nextTimeframeSignal(window(90), { step1: true, step2: true });
+  assert.deepEqual(result, { step1: true, step2: true });
+});
+
+test('after reset, a subsequent drop can re-enter step1 independently', () => {
+  const resetResult = nextTimeframeSignal(window(110), { step1: true, step2: true });
+  assert.deepEqual(resetResult, { step1: false, step2: false });
+  const reentered = nextTimeframeSignal(window(70), resetResult);
+  assert.equal(reentered.step1, true);
 });

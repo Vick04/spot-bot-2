@@ -17,9 +17,14 @@ export interface CandleData {
   timestamp: number;
 }
 
+export interface TimeframeSignal {
+  step1: boolean;
+  step2: boolean;
+}
+
 export interface SignalReasons {
-  bbUpper1m: boolean;
-  bbUpper1h: boolean;
+  m1: TimeframeSignal;
+  h1: TimeframeSignal;
 }
 
 export interface ObserverState {
