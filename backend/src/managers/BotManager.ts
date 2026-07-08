@@ -1,21 +1,27 @@
 import { SymbolManager } from '../services/symbolManager';
 import { ObserverManager } from './ObserverManager';
+import { OrderManager } from './OrderManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
 import { fetchHistoricalCandles, fetchClosedHourCandles } from '../services/historicalCandles';
 
-/** 200 closed candles per symbol per timeframe — backs both live signal
- * detection (which only reads the tail it needs) and the 100-candle chart
- * window with a full MA99 lookback (see observers/Observer.ts). */
-const PRELOAD_CANDLES = 200;
+/** Chart/detection buffer size — unchanged from before. */
+const CHART_PRELOAD_CANDLES = 200;
+
+/** 24h of 1m candles (60 * 24), used to warm up the liquidity-based
+ * order-sizing volume window (see observers/Observer.ts). The same fetch
+ * also supplies the chart/detection buffer (its most recent 200 candles). */
+const VOLUME_PRELOAD_CANDLES = 1440;
 
 export class BotManager {
   readonly symbolManager: SymbolManager;
   readonly observerManager: ObserverManager;
+  readonly orderManager: OrderManager;
   private ws: BinanceWebSocket | null = null;
 
   constructor() {
     this.symbolManager = new SymbolManager();
     this.observerManager = new ObserverManager();
+    this.orderManager = new OrderManager();
   }
 
   async start(): Promise<void> {
@@ -26,7 +32,12 @@ export class BotManager {
     await this.preloadObservers(symbols);
 
     this.ws = new BinanceWebSocket(symbols);
-    this.ws.on('candle', candle => this.observerManager.updateCandle(candle));
+    this.ws.on('candle', candle => {
+      this.observerManager.updateCandle(candle);
+      if (candle.timeframe === '1s') {
+        this.orderManager.onPriceTick(candle.symbol, candle.close);
+      }
+    });
     this.ws.connect();
   }
 
@@ -40,8 +51,9 @@ export class BotManager {
 
     const results = await Promise.allSettled(
       symbols.map(async symbol => {
-        const candles = await fetchHistoricalCandles(symbol, PRELOAD_CANDLES);
-        this.observerManager.preloadObserver1m(symbol, candles);
+        const candles = await fetchHistoricalCandles(symbol, VOLUME_PRELOAD_CANDLES);
+        this.observerManager.preloadObserver1m(symbol, candles.slice(-CHART_PRELOAD_CANDLES));
+        this.observerManager.preloadObserverVolume(symbol, candles);
       })
     );
 
@@ -50,11 +62,11 @@ export class BotManager {
       .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
       .forEach(r => console.error('[Preload] 1m candles failed:', r.reason));
 
-    console.log(`[Preload] Done — ${ok}/${symbols.length} observers' 1m windows loaded`);
+    console.log(`[Preload] Done — ${ok}/${symbols.length} observers' 1m/volume windows loaded`);
 
     const hourResults = await Promise.allSettled(
       symbols.map(async symbol => {
-        const candles = await fetchClosedHourCandles(symbol, PRELOAD_CANDLES);
+        const candles = await fetchClosedHourCandles(symbol, CHART_PRELOAD_CANDLES);
         this.observerManager.preloadObserver1h(symbol, candles);
       })
     );
