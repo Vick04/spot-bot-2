@@ -18,7 +18,7 @@ async function main() {
   app.use('/api', createRouter(bot));
 
   const httpServer = http.createServer(app);
-  createSocketServer(httpServer, bot.observerManager);
+  createSocketServer(httpServer, bot.observerManager, bot.orderManager);
 
   httpServer.listen(PORT, () => {
     console.log(`[Server] Listening on http://localhost:${PORT}`);
