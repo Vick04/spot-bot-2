@@ -9,6 +9,7 @@ export interface Candle {
   low: number;
   close: number;
   isClosed: boolean;
+  quoteVolume?: number;
 }
 
 export interface CandleData {
@@ -69,4 +70,41 @@ export interface ChartClosedEvent {
   timeframe: ChartTimeframe;
   candle: ChartCandle;
   series: ChartSeriesPoint;
+}
+
+export interface ActiveOrder {
+  symbol: string;
+  buyPrice: number;
+  targetPrice: number;
+  quantity: number;
+  usdtSpent: number;
+  openedAt: number;
+}
+
+export interface CompletedOrder extends ActiveOrder {
+  sellPrice: number;
+  usdtReceived: number;
+  profit: number;
+  profitPct: number;
+  closedAt: number;
+  durationMs: number;
+}
+
+export interface OrderStatus {
+  balance: number;
+  activeOrders: ActiveOrder[];
+  completedCount: number;
+  totalProfitPct: number;
+}
+
+export interface OrderOpenedEvent {
+  order: ActiveOrder;
+  balance: number;
+}
+
+export interface OrderCompletedEvent {
+  order: CompletedOrder;
+  balance: number;
+  completedCount: number;
+  totalProfitPct: number;
 }
