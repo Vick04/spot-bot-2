@@ -130,6 +130,20 @@ export class ObserverManager extends EventEmitter {
     this.observers.get(symbol)?.preloadClosed1h(candles);
   }
 
+  preloadObserverVolume(symbol: string, candles: Candle[]): void {
+    this.observers.get(symbol)?.preloadQuoteVolume1m(candles);
+  }
+
+  getQuoteVolume24h(symbol: string): number | null {
+    const observer = this.observers.get(symbol);
+    return observer ? observer.get24hQuoteVolume() : null;
+  }
+
+  getCurrentPrice(symbol: string): number | null {
+    const observer = this.observers.get(symbol);
+    return observer ? observer.getCurrentPrice() : null;
+  }
+
   getSymbols(): string[] {
     return Array.from(this.observers.keys());
   }
