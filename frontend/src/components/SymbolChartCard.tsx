@@ -1,14 +1,19 @@
 import { useState } from 'react';
-import { ChartTimeframe } from '../types';
+import { ActiveOrder, ChartTimeframe } from '../types';
 import { SymbolChart } from './SymbolChart';
+import { useSymbolChartData } from '../hooks/useSymbolChartData';
 
 interface Props {
   symbol: string;
   isPinned: boolean;
   onTogglePin: () => void;
+  activeOrder: ActiveOrder | null;
+  orderSize: number;
+  onBuy: () => void;
 }
 
 const TIMEFRAMES: ChartTimeframe[] = ['1m', '1h'];
+const TARGET_MULT = 1.005;
 
 /** All symbols in this app are USDT pairs (e.g. "BTCUSDT" -> "BTC_USDT"). */
 function binanceSpotUrl(symbol: string): string {
@@ -16,8 +21,16 @@ function binanceSpotUrl(symbol: string): string {
   return `https://www.binance.com/es-AR/trade/${base}_USDT?type=spot`;
 }
 
-export function SymbolChartCard({ symbol, isPinned, onTogglePin }: Props) {
+function fmtPrice(value: number): string {
+  return value.toFixed(6);
+}
+
+export function SymbolChartCard({ symbol, isPinned, onTogglePin, activeOrder, orderSize, onBuy }: Props) {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('1m');
+  const { candles, series, loading, error } = useSymbolChartData(symbol, timeframe);
+
+  const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : null;
+  const targetPrice = currentPrice !== null ? currentPrice * TARGET_MULT : null;
 
   return (
     <div className="rounded border border-gray-800 bg-gray-900 p-3">
@@ -56,7 +69,30 @@ export function SymbolChartCard({ symbol, isPinned, onTogglePin }: Props) {
           ))}
         </div>
       </div>
-      <SymbolChart symbol={symbol} timeframe={timeframe} />
+
+      <SymbolChart candles={candles} series={series} loading={loading} error={error} />
+
+      <div className="mt-2 pt-2 border-t border-gray-800 flex items-center justify-between text-xs font-mono">
+        <div className="flex flex-col gap-0.5 text-gray-400">
+          <span>Price: <span className="text-gray-200">{currentPrice !== null ? fmtPrice(currentPrice) : '—'}</span></span>
+          <span>Target: <span className="text-green-400">{targetPrice !== null ? fmtPrice(targetPrice) : '—'}</span></span>
+          <span>Size: <span className="text-gray-200">{orderSize.toFixed(2)} USDT</span></span>
+        </div>
+        {activeOrder ? (
+          <div className="text-right text-yellow-400">
+            <div>Active</div>
+            <div className="text-gray-400">buy {fmtPrice(activeOrder.buyPrice)}</div>
+          </div>
+        ) : (
+          <button
+            onClick={onBuy}
+            disabled={orderSize <= 0 || currentPrice === null}
+            className="px-3 py-1 rounded bg-green-600 text-white text-xs disabled:bg-gray-700 disabled:text-gray-500"
+          >
+            Buy
+          </button>
+        )}
+      </div>
     </div>
   );
 }
