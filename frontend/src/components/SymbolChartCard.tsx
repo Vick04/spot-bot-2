@@ -13,7 +13,7 @@ interface Props {
 }
 
 const TIMEFRAMES: ChartTimeframe[] = ['1m', '1h'];
-const TARGET_MULT = 1.005;
+const TARGET_PCT = 0.005; // +0.5%
 
 /** All symbols in this app are USDT pairs (e.g. "BTCUSDT" -> "BTC_USDT"). */
 function binanceSpotUrl(symbol: string): string {
@@ -30,7 +30,9 @@ export function SymbolChartCard({ symbol, isPinned, onTogglePin, activeOrder, or
   const { candles, series, loading, error } = useSymbolChartData(symbol, timeframe);
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : null;
-  const targetPrice = currentPrice !== null ? currentPrice * TARGET_MULT : null;
+  // price + price*pct (not price*mult) avoids IEEE754 drift (e.g. 100*1.005 !== 100.5),
+  // matching the backend's OrderManager target calculation.
+  const targetPrice = currentPrice !== null ? currentPrice + currentPrice * TARGET_PCT : null;
 
   return (
     <div className="rounded border border-gray-800 bg-gray-900 p-3">

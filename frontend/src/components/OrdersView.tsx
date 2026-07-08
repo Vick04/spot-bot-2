@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useOrders } from '../hooks/useOrders';
 
 function fmtPrice(value: number): string {
@@ -18,6 +19,16 @@ function fmtElapsed(openedAt: number): string {
 
 export function OrdersView() {
   const { balance, activeOrders, completedCount, totalProfitPct } = useOrders();
+
+  // fmtElapsed reads Date.now() at render time — without this, "Open for"
+  // would freeze at whatever value it had the last time useOrders' state
+  // actually changed (an order opening/completing), not tick live.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (activeOrders.length === 0) return;
+    const interval = setInterval(() => forceTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [activeOrders.length]);
 
   return (
     <div>
