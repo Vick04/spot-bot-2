@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { createChart, CandlestickSeries, IChartApi, LineSeries, ISeriesApi, LineData, UTCTimestamp, WhitespaceData } from 'lightweight-charts';
-import { ChartTimeframe } from '../types';
-import { useSymbolChartData } from '../hooks/useSymbolChartData';
+import { ChartCandle, ChartSeries } from '../types';
 
 interface Props {
-  symbol: string;
-  timeframe: ChartTimeframe;
+  candles: ChartCandle[];
+  series: ChartSeries;
+  loading: boolean;
+  error: string | null;
 }
 
 /** The data buffer holds 100 candles, but the initial view zooms in to the
@@ -16,7 +17,7 @@ function toTime(openTimeMs: number): UTCTimestamp {
   return Math.floor(openTimeMs / 1000) as UTCTimestamp;
 }
 
-export function SymbolChart({ symbol, timeframe }: Props) {
+export function SymbolChart({ candles, series, loading, error }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -25,14 +26,6 @@ export function SymbolChart({ symbol, timeframe }: Props) {
   const bbUpperSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const bbLowerSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const hasSetInitialRangeRef = useRef(false);
-
-  const { candles, series, loading, error } = useSymbolChartData(symbol, timeframe);
-
-  // A genuinely new dataset (symbol or timeframe change) should re-zoom to
-  // the most recent INITIAL_VISIBLE_CANDLES, same as a fresh mount.
-  useEffect(() => {
-    hasSetInitialRangeRef.current = false;
-  }, [symbol, timeframe]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -46,8 +39,6 @@ export function SymbolChart({ symbol, timeframe }: Props) {
     });
     chartRef.current = chart;
 
-    // 6 decimal places on the price axis — most of these symbols trade at
-    // sub-$1 prices where the default 2-decimal format loses precision.
     const priceFormat = { type: 'price' as const, precision: 6, minMove: 0.000001 };
 
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
@@ -58,9 +49,6 @@ export function SymbolChart({ symbol, timeframe }: Props) {
       wickDownColor: '#ef4444',
       priceFormat,
     });
-    // priceLineVisible/lastValueVisible off: these draw a dashed straight
-    // line + value label at the series' latest value, which doesn't follow
-    // history — out of place alongside the historical overlay lines.
     const noPriceLine = { priceLineVisible: false, lastValueVisible: false };
     ma20SeriesRef.current = chart.addSeries(LineSeries, { color: '#ecb619', lineWidth: 2, priceFormat, ...noPriceLine });
     ma99SeriesRef.current = chart.addSeries(LineSeries, { color: '#FFF', lineWidth: 3, priceFormat, ...noPriceLine });
@@ -81,15 +69,17 @@ export function SymbolChart({ symbol, timeframe }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!candleSeriesRef.current || candles.length === 0) return;
+    if (!candleSeriesRef.current || candles.length === 0) {
+      // No data yet (or the underlying dataset was just reset, e.g. a
+      // symbol/timeframe change upstream) — re-zoom once real data returns.
+      hasSetInitialRangeRef.current = false;
+      return;
+    }
 
     candleSeriesRef.current.setData(
       candles.map(c => ({ time: toTime(c.openTime), open: c.open, high: c.high, low: c.low, close: c.close }))
     );
 
-    // Points with no computed value become whitespace (a gap) instead of
-    // being filtered out — filtering would make lightweight-charts draw a
-    // straight line connecting the nearest valid points across the gap.
     const toLineData = (values: (number | null)[]): (LineData<UTCTimestamp> | WhitespaceData<UTCTimestamp>)[] =>
       candles.map((c, i) => {
         const time = toTime(c.openTime);
