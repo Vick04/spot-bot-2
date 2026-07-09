@@ -8,10 +8,19 @@ export interface SignalReasons {
   h1: TimeframeSignal;
 }
 
+export interface PerformanceWindows {
+  h24: number | null;
+  h12: number | null;
+  h6: number | null;
+  h3: number | null;
+  h1: number | null;
+}
+
 export interface ObserverData {
   symbol: string;
   qualifies: boolean;
   reasons: SignalReasons;
+  performance: PerformanceWindows;
 }
 
 export interface ApiResponse<T> {
