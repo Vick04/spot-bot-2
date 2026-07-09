@@ -33,7 +33,7 @@ export class ObserverManager extends EventEmitter {
     const observer = this.observers.get(candle.symbol);
     if (!observer) return;
 
-    const qualifiedBefore = observer.getState().qualifies;
+    const before = observer.getState();
 
     if (candle.timeframe === '1s') {
       observer.updateCandle1s(candle);
@@ -44,7 +44,16 @@ export class ObserverManager extends EventEmitter {
     }
 
     const state = observer.getState();
-    if (state.qualifies !== qualifiedBefore) {
+    // Compare all four step booleans, not just `qualifies` (which is their
+    // OR): qualifies can stay true across a step1->step2 transition (step2
+    // only ever sets while step1 is already true), so gating on it alone
+    // misses the "Watching" -> "Ready" update the frontend depends on.
+    const reasonsChanged =
+      state.reasons.m1.step1 !== before.reasons.m1.step1 ||
+      state.reasons.m1.step2 !== before.reasons.m1.step2 ||
+      state.reasons.h1.step1 !== before.reasons.h1.step1 ||
+      state.reasons.h1.step2 !== before.reasons.h1.step2;
+    if (reasonsChanged) {
       this.emit('signal', state);
     }
 

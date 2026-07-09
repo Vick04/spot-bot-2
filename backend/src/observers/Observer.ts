@@ -1,6 +1,6 @@
 import { Candle, ChartCandle, ChartTimeframe, ObserverState, SignalReasons, TimeframeSignal } from '../types';
 import { Queue } from '../utils/Queue';
-import { nextTimeframeSignal, EMPTY_TIMEFRAME_SIGNAL } from '../utils/signals';
+import { nextTimeframeSignal } from '../utils/signals';
 
 /** 200 closed candles per timeframe: enough for a 100-candle visible chart
  * window with a full 99-candle MA99 lookback at the first visible point,
@@ -22,8 +22,8 @@ export class Observer {
   private form1mCandle: Candle | null = null;
   private form1hCandle: Candle | null = null;
   private currentPrice: number | null = null;
-  private m1Signal: TimeframeSignal = EMPTY_TIMEFRAME_SIGNAL;
-  private h1Signal: TimeframeSignal = EMPTY_TIMEFRAME_SIGNAL;
+  private m1Signal: TimeframeSignal = { step1: false, step2: false };
+  private h1Signal: TimeframeSignal = { step1: false, step2: false };
 
   constructor(symbol: string) {
     this.symbol = symbol;
