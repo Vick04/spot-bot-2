@@ -98,3 +98,39 @@ test('a candle close where nothing changes does not emit signal', () => {
   assert.deepEqual(after.reasons, settled.reasons);
   assert.equal(signals.length, 0);
 });
+
+test('a closed 1h candle emits signal even when reasons and step state are unchanged', () => {
+  const manager = new ObserverManager();
+  manager.createObserver('BTCUSDT');
+  const signals = listenSignals(manager);
+
+  // A single 1h close: reasons stay {false,false} (below the 20-candle
+  // signals window), but performance is recomputed from the 1h buffer on
+  // every 1h close, so the broadcast must still fire.
+  manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 0, open: 100, high: 100, low: 100, close: 100, isClosed: true });
+
+  assert.equal(signals.length, 1);
+  assert.deepEqual(signals[0].reasons, { m1: { step1: false, step2: false }, h1: { step1: false, step2: false } });
+});
+
+test('a second closed 1h candle also emits, not just the first', () => {
+  const manager = new ObserverManager();
+  manager.createObserver('BTCUSDT');
+  manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 0, open: 100, high: 100, low: 100, close: 100, isClosed: true });
+
+  const signals = listenSignals(manager);
+  manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 1, open: 110, high: 110, low: 110, close: 110, isClosed: true });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].performance.h1, ((110 - 100) / 100) * 100);
+});
+
+test('a non-closed (forming) 1h candle does not emit on its own', () => {
+  const manager = new ObserverManager();
+  manager.createObserver('BTCUSDT');
+  const signals = listenSignals(manager);
+
+  manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 0, open: 100, high: 100, low: 100, close: 100, isClosed: false });
+
+  assert.equal(signals.length, 0);
+});

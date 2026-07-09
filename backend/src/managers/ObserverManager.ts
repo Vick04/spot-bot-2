@@ -53,7 +53,12 @@ export class ObserverManager extends EventEmitter {
       state.reasons.m1.step2 !== before.reasons.m1.step2 ||
       state.reasons.h1.step1 !== before.reasons.h1.step1 ||
       state.reasons.h1.step2 !== before.reasons.h1.step2;
-    if (reasonsChanged) {
+    // Performance windows are recomputed on every closed 1h candle (see
+    // Observer.updateCandle1h) even when step1/step2 don't change — the
+    // broadcast must fire on that trigger unconditionally too, otherwise
+    // performance on the frontend would only refresh on step transitions.
+    const is1hClose = candle.timeframe === '1h' && candle.isClosed;
+    if (reasonsChanged || is1hClose) {
       this.emit('signal', state);
     }
 
