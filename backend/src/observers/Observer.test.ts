@@ -146,3 +146,60 @@ test('a live closed 1m candle after preload continues the replayed state (reache
   assert.equal(reasons.m1.step1, true);
   assert.equal(reasons.m1.step2, true);
 });
+
+function closedHourAt(openTime: number, close: number): Candle {
+  return { symbol: 'BTCUSDT', timeframe: '1h', openTime, open: close, high: close, low: close, close, isClosed: true };
+}
+
+test('performance is all-null before any 1h candle is loaded', () => {
+  const observer = new Observer('BTCUSDT');
+  assert.deepEqual(observer.getState().performance, { h24: null, h12: null, h6: null, h3: null, h1: null });
+});
+
+test('preloadClosed1h computes performance from the preloaded buffer', () => {
+  const observer = new Observer('BTCUSDT');
+  const closes = Array.from({ length: 25 }, (_, i) => closedHourAt(i, 100 + i));
+  observer.preloadClosed1h(closes);
+
+  const performance = observer.getState().performance;
+  // Same formula as performance.test.ts's 25-candle case: close[i] = 100 + i.
+  assert.equal(performance.h24, ((124 - 100) / 100) * 100);
+  assert.equal(performance.h1, ((124 - 123) / 123) * 100);
+});
+
+test('preloadClosed1h with too few candles leaves performance null for all windows', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1h([closedHourAt(0, 100)]);
+  assert.deepEqual(observer.getState().performance, { h24: null, h12: null, h6: null, h3: null, h1: null });
+});
+
+test('a closed 1h candle recomputes performance on top of the existing buffer', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1h([closedHourAt(0, 100)]);
+  assert.equal(observer.getState().performance.h1, null);
+
+  observer.updateCandle1h(closedHourAt(1, 110));
+
+  const performance = observer.getState().performance;
+  assert.equal(performance.h1, ((110 - 100) / 100) * 100);
+});
+
+test('a non-closed (forming) 1h candle does not recompute performance', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1h([closedHourAt(0, 100), closedHourAt(1, 110)]);
+  const before = observer.getState().performance;
+
+  observer.updateCandle1h({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 2, open: 999, high: 999, low: 999, close: 999, isClosed: false });
+
+  assert.deepEqual(observer.getState().performance, before);
+});
+
+test('updateCandle1m does not affect performance (1h-buffer-derived only)', () => {
+  const observer = new Observer('BTCUSDT');
+  observer.preloadClosed1h([closedHourAt(0, 100), closedHourAt(1, 110)]);
+  const before = observer.getState().performance;
+
+  observer.updateCandle1m({ symbol: 'BTCUSDT', timeframe: '1m', openTime: 0, open: 500, high: 500, low: 500, close: 500, isClosed: true });
+
+  assert.deepEqual(observer.getState().performance, before);
+});

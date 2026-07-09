@@ -27,10 +27,19 @@ export interface SignalReasons {
   h1: TimeframeSignal;
 }
 
+export interface PerformanceWindows {
+  h24: number | null;
+  h12: number | null;
+  h6: number | null;
+  h3: number | null;
+  h1: number | null;
+}
+
 export interface ObserverState {
   symbol: string;
   qualifies: boolean;
   reasons: SignalReasons;
+  performance: PerformanceWindows;
 }
 
 export type ChartTimeframe = '1m' | '1h';

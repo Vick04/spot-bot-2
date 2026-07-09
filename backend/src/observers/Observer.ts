@@ -1,12 +1,14 @@
-import { Candle, ChartCandle, ChartTimeframe, ObserverState, SignalReasons, TimeframeSignal } from '../types';
+import { Candle, ChartCandle, ChartTimeframe, ObserverState, PerformanceWindows, SignalReasons, TimeframeSignal } from '../types';
 import { Queue } from '../utils/Queue';
 import { nextTimeframeSignal } from '../utils/signals';
+import { computePerformance } from '../utils/performance';
 
 /** 200 closed candles per timeframe: enough for a 100-candle visible chart
  * window with a full 99-candle MA99 lookback at the first visible point,
  * plus margin. Also backs signal detection, which only reads the tail (last
  * 20 — see utils/signals.ts) regardless of total buffer size, so this size
- * increase does not change detection behavior. */
+ * increase does not change detection behavior. Also comfortably covers the
+ * 24h performance window (24 hourly candles), see utils/performance.ts. */
 const CHART_HISTORY_CANDLES = 200;
 
 /** 1 quote-volume value per closed 1m candle, covering a rolling 24h window
@@ -24,6 +26,7 @@ export class Observer {
   private currentPrice: number | null = null;
   private m1Signal: TimeframeSignal = { step1: false, step2: false };
   private h1Signal: TimeframeSignal = { step1: false, step2: false };
+  private performance: PerformanceWindows = computePerformance([]);
 
   constructor(symbol: string) {
     this.symbol = symbol;
@@ -43,12 +46,16 @@ export class Observer {
     });
   }
 
-  /** Same replay behavior as preloadClosed1m, for the 1h state machine. */
+  /** Same replay behavior as preloadClosed1m, for the 1h state machine, plus
+   * a single performance recompute once the buffer is fully loaded
+   * (performance has no stickiness/history dependency beyond "what's the
+   * buffer right now", unlike step1/step2 — no need to recompute per candle). */
   preloadClosed1h(candles: Candle[]): void {
     candles.forEach(c => {
       this.closed1h.push(c);
       this.h1Signal = nextTimeframeSignal(this.closed1h.toArray(), this.h1Signal);
     });
+    this.performance = computePerformance(this.closed1h.toArray());
   }
 
   /** Feeds the 24h rolling quote-volume window without touching the chart
@@ -78,6 +85,7 @@ export class Observer {
       this.closed1h.push(candle);
       this.form1hCandle = null;
       this.h1Signal = nextTimeframeSignal(this.closed1h.toArray(), this.h1Signal);
+      this.performance = computePerformance(this.closed1h.toArray());
     } else {
       this.form1hCandle = candle;
     }
@@ -86,7 +94,7 @@ export class Observer {
   getState(): ObserverState {
     const reasons: SignalReasons = { m1: this.m1Signal, h1: this.h1Signal };
     const qualifies = reasons.m1.step1 || reasons.m1.step2 || reasons.h1.step1 || reasons.h1.step2;
-    return { symbol: this.symbol, qualifies, reasons };
+    return { symbol: this.symbol, qualifies, reasons, performance: this.performance };
   }
 
   /** Sum of the last (up to) 1440 closed 1m candles' quote volume. Below a
