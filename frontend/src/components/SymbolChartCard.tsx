@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActiveOrder, ChartTimeframe } from '../types';
+import { ActiveOrder, ChartTimeframe, PerformanceWindows } from '../types';
 import { SymbolChart } from './SymbolChart';
 import { useSymbolChartData } from '../hooks/useSymbolChartData';
 
@@ -8,6 +8,7 @@ interface Props {
   isPinned: boolean;
   onTogglePin: () => void;
   isReady: boolean;
+  performance: PerformanceWindows;
   activeOrder: ActiveOrder | null;
   orderSize: number;
   onBuy: () => void;
@@ -15,6 +16,14 @@ interface Props {
 
 const TIMEFRAMES: ChartTimeframe[] = ['1m', '1h'];
 const TARGET_PCT = 0.005; // +0.5%
+
+const PERFORMANCE_WINDOWS: { key: keyof PerformanceWindows; label: string }[] = [
+  { key: 'h24', label: '24h' },
+  { key: 'h12', label: '12h' },
+  { key: 'h6', label: '6h' },
+  { key: 'h3', label: '3h' },
+  { key: 'h1', label: '1h' },
+];
 
 /** All symbols in this app are USDT pairs (e.g. "BTCUSDT" -> "BTC_USDT"). */
 function binanceSpotUrl(symbol: string): string {
@@ -26,7 +35,26 @@ function fmtPrice(value: number): string {
   return value.toFixed(6);
 }
 
-export function SymbolChartCard({ symbol, isPinned, onTogglePin, isReady, activeOrder, orderSize, onBuy }: Props) {
+function fmtPerf(value: number | null): string {
+  if (value === null) return '—';
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+function perfColor(value: number | null): string {
+  if (value === null) return 'text-gray-500';
+  return value >= 0 ? 'text-green-400' : 'text-red-400';
+}
+
+export function SymbolChartCard({
+  symbol,
+  isPinned,
+  onTogglePin,
+  isReady,
+  performance,
+  activeOrder,
+  orderSize,
+  onBuy,
+}: Props) {
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('1m');
   const { candles, series, loading, error } = useSymbolChartData(symbol, timeframe);
 
@@ -76,6 +104,15 @@ export function SymbolChartCard({ symbol, isPinned, onTogglePin, isReady, active
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-2 text-[10px] font-mono">
+        {PERFORMANCE_WINDOWS.map(({ key, label }) => (
+          <div key={key} className="flex flex-col items-center gap-0.5">
+            <span className="text-gray-500">{label}</span>
+            <span className={perfColor(performance[key])}>{fmtPerf(performance[key])}</span>
+          </div>
+        ))}
       </div>
 
       <SymbolChart candles={candles} series={series} loading={loading} error={error} />
