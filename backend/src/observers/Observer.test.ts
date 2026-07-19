@@ -86,65 +86,70 @@ function closedCandleAt(openTime: number, close: number): Candle {
   return { symbol: 'BTCUSDT', timeframe: '1m', openTime, open: close, high: close, low: close, close, isClosed: true };
 }
 
-/** 20-candle window: 10 closes at 90, 9 closes at 100, then `last`, with
- * ascending openTime starting at `startAt`. Mirrors the window shape used
- * in signals.test.ts (see that file's comment for why a two-cluster shape
- * is needed): last=70 crosses step1 (<= lower) without reset; a further
- * single close of 100 right after crosses step2 (>= middle) without reset
- * (verified with a throwaway script computing bollingerBands() over the
- * resulting sliding windows). */
-function stepWindow(startAt: number, last: number): Candle[] {
-  const closes = Array(10).fill(90).concat(Array(9).fill(100)).concat([last]);
+/** Same 26-candle cold-start-confirms-MAX sequence verified in
+ * backend/src/utils/zigzag.test.ts: seed at 110, then 25 candles declining
+ * by 0.1 each. The confirming candle is index 20 (0-indexed) -- the first 20
+ * candles (indices 0-19) do NOT confirm anything yet. */
+function coldStartMaxSequence(startAt: number): Candle[] {
+  const closes = [110, ...Array.from({ length: 25 }, (_, k) => +(110 - 0.1 * (k + 1)).toFixed(2))];
   return closes.map((close, i) => closedCandleAt(startAt + i, close));
 }
 
-test('updateCandle1s never changes signal state, only currentPrice', () => {
+test('zigzag is at its initial empty state before any candle is loaded', () => {
   const observer = new Observer('BTCUSDT');
-  const before = observer.getState().reasons;
+  const zigzag = observer.getState().zigzag;
+  assert.equal(zigzag.direction, null);
+  assert.equal(zigzag.lastPivot, null);
+});
+
+test('updateCandle1s never changes zigzag or performance state, only currentPrice', () => {
+  const observer = new Observer('BTCUSDT');
+  const beforeZigzag = observer.getState().zigzag;
+  const beforePerf = observer.getState().performance;
   observer.updateCandle1s({ symbol: 'BTCUSDT', timeframe: '1s', openTime: 1, open: 999999, high: 999999, low: 999999, close: 999999, isClosed: true });
-  assert.deepEqual(observer.getState().reasons, before);
+  assert.deepEqual(observer.getState().zigzag, beforeZigzag);
+  assert.deepEqual(observer.getState().performance, beforePerf);
   assert.equal(observer.getCurrentPrice(), 999999);
 });
 
-test('a live (non-closed) 1m candle does not advance the 1m state machine', () => {
+test('a live (non-closed) 1m candle does not advance the zigzag state', () => {
   const observer = new Observer('BTCUSDT');
-  const candles19 = Array.from({ length: 19 }, (_, i) => closedCandleAt(i, 100 + i));
-  observer.preloadClosed1m(candles19);
-  const before = observer.getState().reasons.m1;
-  observer.updateCandle1m(formingCandle(20, 50, 50, 50, 50));
-  assert.deepEqual(observer.getState().reasons.m1, before);
+  observer.preloadClosed1m([closedCandleAt(0, 110)]);
+  const before = observer.getState().zigzag;
+  observer.updateCandle1m(formingCandle(1, 50, 50, 50, 50));
+  assert.deepEqual(observer.getState().zigzag, before);
 });
 
-test('preloadClosed1m replays the state machine so restart reconstructs true state (reaches step1)', () => {
+test('preloadClosed1m replays the zigzag detector so restart reconstructs true state', () => {
   const observer = new Observer('BTCUSDT');
-  observer.preloadClosed1m(stepWindow(0, 70));
-  const reasons = observer.getState().reasons;
-  assert.equal(reasons.m1.step1, true);
-  assert.equal(reasons.m1.step2, false);
-  assert.equal(reasons.h1.step1, false);
-  assert.equal(observer.getState().qualifies, true);
+  observer.preloadClosed1m(coldStartMaxSequence(0));
+
+  const zigzag = observer.getState().zigzag;
+  assert.equal(zigzag.direction, 'down');
+  assert.deepEqual(zigzag.lastPivot, { price: 110, type: 'max' });
 });
 
-test('preloadClosed1h replays independently from preloadClosed1m', () => {
+test('preloadClosed1h does NOT advance the zigzag detector (the configured timeframe is 1m)', () => {
   const observer = new Observer('BTCUSDT');
-  observer.preloadClosed1h(stepWindow(0, 70));
-  const reasons = observer.getState().reasons;
-  assert.equal(reasons.h1.step1, true);
-  assert.equal(reasons.m1.step1, false);
+  const hourCandles = coldStartMaxSequence(0).map(c => ({ ...c, timeframe: '1h' as const }));
+  observer.preloadClosed1h(hourCandles);
+
+  const zigzag = observer.getState().zigzag;
+  assert.equal(zigzag.direction, null);
+  assert.equal(zigzag.lastPivot, null);
 });
 
-test('a live closed 1m candle after preload continues the replayed state (reaches step2)', () => {
+test('a live closed 1m candle after preload continues the replayed zigzag state', () => {
   const observer = new Observer('BTCUSDT');
-  observer.preloadClosed1m(stepWindow(0, 70));
-  assert.equal(observer.getState().reasons.m1.step1, true);
+  observer.preloadClosed1m(coldStartMaxSequence(0));
+  assert.equal(observer.getState().zigzag.direction, 'down');
+  const extremeBefore = observer.getState().zigzag.extremePrice;
 
-  // One more close (openTime 20, close 100) slides the 20-window forward
-  // by one and crosses the middle band without crossing the upper band.
-  observer.updateCandle1m(closedCandleAt(20, 100));
+  observer.updateCandle1m(closedCandleAt(26, extremeBefore - 1));
 
-  const reasons = observer.getState().reasons;
-  assert.equal(reasons.m1.step1, true);
-  assert.equal(reasons.m1.step2, true);
+  const zigzag = observer.getState().zigzag;
+  assert.equal(zigzag.extremePrice, extremeBefore - 1);
+  assert.equal(zigzag.barsSinceExtreme, 0);
 });
 
 function closedHourAt(openTime: number, close: number): Candle {
@@ -162,7 +167,6 @@ test('preloadClosed1h computes performance from the preloaded buffer', () => {
   observer.preloadClosed1h(closes);
 
   const performance = observer.getState().performance;
-  // Same formula as performance.test.ts's 25-candle case: close[i] = 100 + i.
   assert.equal(performance.h24, ((124 - 100) / 100) * 100);
   assert.equal(performance.h1, ((124 - 123) / 123) * 100);
 });

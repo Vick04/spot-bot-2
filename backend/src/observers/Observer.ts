@@ -1,19 +1,23 @@
-import { Candle, ChartCandle, ChartTimeframe, ObserverState, PerformanceWindows, SignalReasons, TimeframeSignal } from '../types';
+import { Candle, ChartCandle, ChartTimeframe, ObserverState, PerformanceWindows, ZigZagState } from '../types';
 import { Queue } from '../utils/Queue';
-import { nextTimeframeSignal } from '../utils/signals';
 import { computePerformance } from '../utils/performance';
+import { nextZigZagState, EMPTY_ZIGZAG_STATE } from '../utils/zigzag';
 
 /** 200 closed candles per timeframe: enough for a 100-candle visible chart
  * window with a full 99-candle MA99 lookback at the first visible point,
- * plus margin. Also backs signal detection, which only reads the tail (last
- * 20 — see utils/signals.ts) regardless of total buffer size, so this size
- * increase does not change detection behavior. Also comfortably covers the
- * 24h performance window (24 hourly candles), see utils/performance.ts. */
+ * plus margin. Also comfortably covers the 24h performance window (24
+ * hourly candles) and the ZigZag detector's 20-bar minimum gap. */
 const CHART_HISTORY_CANDLES = 200;
 
 /** 1 quote-volume value per closed 1m candle, covering a rolling 24h window
  * (60 * 24 = 1440 minutes), used for liquidity-based order sizing. */
 const QUOTE_VOLUME_WINDOW = 1440;
+
+/** Which closed-candle buffer drives the ZigZag pivot detector -- a single
+ * global choice (unlike the old per-timeframe step1/step2 system). To be
+ * calibrated against real BTC history via the emulator (separate
+ * sub-project) before changing this. */
+const ZIGZAG_TIMEFRAME: ChartTimeframe = '1m';
 
 export class Observer {
   private symbol: string;
@@ -24,9 +28,8 @@ export class Observer {
   private form1mCandle: Candle | null = null;
   private form1hCandle: Candle | null = null;
   private currentPrice: number | null = null;
-  private m1Signal: TimeframeSignal = { step1: false, step2: false };
-  private h1Signal: TimeframeSignal = { step1: false, step2: false };
   private performance: PerformanceWindows = computePerformance([]);
+  private zigzag: ZigZagState = EMPTY_ZIGZAG_STATE;
 
   constructor(symbol: string) {
     this.symbol = symbol;
@@ -35,31 +38,36 @@ export class Observer {
     this.quoteVol1m = new Queue<number>(QUOTE_VOLUME_WINDOW);
   }
 
-  /** Pushes each candle into the chart buffer AND replays it through the
-   * 1m state machine in order, so a freshly started observer (fed ~200
-   * historical candles) reconstructs the same step1/step2 state a
-   * continuously-running observer would have reached — not a blank slate. */
+  /** Pushes each candle into the 1m chart buffer. If ZIGZAG_TIMEFRAME is
+   * '1m', also replays nextZigZagState() candle-by-candle so a freshly
+   * started observer reconstructs true pivot state instead of starting
+   * cold -- same replay discipline the old step1/step2 system used. */
   preloadClosed1m(candles: Candle[]): void {
     candles.forEach(c => {
       this.closed1m.push(c);
-      this.m1Signal = nextTimeframeSignal(this.closed1m.toArray(), this.m1Signal);
+      if (ZIGZAG_TIMEFRAME === '1m') {
+        this.zigzag = nextZigZagState(c, this.zigzag);
+      }
     });
   }
 
-  /** Same replay behavior as preloadClosed1m, for the 1h state machine, plus
-   * a single performance recompute once the buffer is fully loaded
-   * (performance has no stickiness/history dependency beyond "what's the
-   * buffer right now", unlike step1/step2 — no need to recompute per candle). */
+  /** Same replay discipline as preloadClosed1m, for the 1h buffer -- only
+   * advances the ZigZag detector if ZIGZAG_TIMEFRAME is '1h'. Always
+   * recomputes performance once at the end (performance has no stickiness
+   * or history dependency beyond "what's the buffer right now", unlike
+   * ZigZag, so it doesn't need a per-candle recompute during replay). */
   preloadClosed1h(candles: Candle[]): void {
     candles.forEach(c => {
       this.closed1h.push(c);
-      this.h1Signal = nextTimeframeSignal(this.closed1h.toArray(), this.h1Signal);
+      if (ZIGZAG_TIMEFRAME === '1h') {
+        this.zigzag = nextZigZagState(c, this.zigzag);
+      }
     });
     this.performance = computePerformance(this.closed1h.toArray());
   }
 
   /** Feeds the 24h rolling quote-volume window without touching the chart
-   * buffer — callers typically pass a longer history here than to
+   * buffer -- callers typically pass a longer history here than to
    * preloadClosed1m (e.g. 1440 candles vs. 200). */
   preloadQuoteVolume1m(candles: Candle[]): void {
     candles.forEach(c => this.pushQuoteVolume(c.quoteVolume ?? 0));
@@ -74,7 +82,9 @@ export class Observer {
       this.closed1m.push(candle);
       this.pushQuoteVolume(candle.quoteVolume ?? 0);
       this.form1mCandle = null;
-      this.m1Signal = nextTimeframeSignal(this.closed1m.toArray(), this.m1Signal);
+      if (ZIGZAG_TIMEFRAME === '1m') {
+        this.zigzag = nextZigZagState(candle, this.zigzag);
+      }
     } else {
       this.form1mCandle = candle;
     }
@@ -84,21 +94,21 @@ export class Observer {
     if (candle.isClosed) {
       this.closed1h.push(candle);
       this.form1hCandle = null;
-      this.h1Signal = nextTimeframeSignal(this.closed1h.toArray(), this.h1Signal);
       this.performance = computePerformance(this.closed1h.toArray());
+      if (ZIGZAG_TIMEFRAME === '1h') {
+        this.zigzag = nextZigZagState(candle, this.zigzag);
+      }
     } else {
       this.form1hCandle = candle;
     }
   }
 
   getState(): ObserverState {
-    const reasons: SignalReasons = { m1: this.m1Signal, h1: this.h1Signal };
-    const qualifies = reasons.m1.step1 || reasons.m1.step2 || reasons.h1.step1 || reasons.h1.step2;
-    return { symbol: this.symbol, qualifies, reasons, performance: this.performance };
+    return { symbol: this.symbol, performance: this.performance, zigzag: this.zigzag };
   }
 
   /** Sum of the last (up to) 1440 closed 1m candles' quote volume. Below a
-   * full window, this underestimates the true 24h volume — self-corrects
+   * full window, this underestimates the true 24h volume -- self-corrects
    * as live data accumulates. */
   get24hQuoteVolume(): number {
     return this.quoteVolSum;
