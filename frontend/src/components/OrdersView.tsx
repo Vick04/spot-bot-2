@@ -48,7 +48,6 @@ export function OrdersView() {
             <tr>
               <th className="py-1 pr-4">Symbol</th>
               <th className="py-1 pr-4">Buy price</th>
-              <th className="py-1 pr-4">Target</th>
               <th className="py-1 pr-4">Open for</th>
             </tr>
           </thead>
@@ -57,7 +56,6 @@ export function OrdersView() {
               <tr key={order.symbol} className="border-b border-gray-900">
                 <td className="py-1 pr-4 text-yellow-400">{order.symbol}</td>
                 <td className="py-1 pr-4">{fmtPrice(order.buyPrice)}</td>
-                <td className="py-1 pr-4 text-green-400">{fmtPrice(order.targetPrice)}</td>
                 <td className="py-1 pr-4 text-gray-400">{fmtElapsed(order.openedAt)}</td>
               </tr>
             ))}

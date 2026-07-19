@@ -9,7 +9,6 @@ export default function App() {
   const { observers, connected } = useSocket();
   const [tab, setTab] = useState<Tab>('charts');
   const observerList = Array.from(observers.values());
-  const qualifyingCount = observerList.filter(o => o.qualifies).length;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -19,7 +18,7 @@ export default function App() {
             <span className="text-yellow-400">SPOT</span>
             <span className="text-gray-400 font-light ml-1">BOT</span>
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Signal detector — {qualifyingCount} qualifying</p>
+          <p className="text-xs text-gray-500 mt-0.5">ZigZag auto-trader</p>
         </div>
         <div className={`flex items-center gap-2 text-xs ${connected ? 'text-green-400' : 'text-red-400'}`}>
           <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`} />
