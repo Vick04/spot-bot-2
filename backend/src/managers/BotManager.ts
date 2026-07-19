@@ -3,14 +3,21 @@ import { ObserverManager } from './ObserverManager';
 import { OrderManager } from './OrderManager';
 import { BinanceWebSocket } from '../services/binanceWebSocket';
 import { fetchHistoricalCandles, fetchClosedHourCandles } from '../services/historicalCandles';
+import { PivotEvent } from '../types';
 
-/** Chart/detection buffer size — unchanged from before. */
+/** Chart/detection buffer size -- unchanged from before. */
 const CHART_PRELOAD_CANDLES = 200;
 
 /** 24h of 1m candles (60 * 24), used to warm up the liquidity-based
  * order-sizing volume window (see observers/Observer.ts). The same fetch
  * also supplies the chart/detection buffer (its most recent 200 candles). */
 const VOLUME_PRELOAD_CANDLES = 1440;
+
+/** Symbols the ZigZag auto-trader is allowed to act on. The Observer
+ * computes ZigZag state for every symbol (cheap, generic) -- this set is
+ * what turns that state into actual buy/sell calls. Mirrored on the
+ * frontend in ChartGrid.tsx; keep both in sync by hand. */
+const ZIGZAG_ENABLED_SYMBOLS = new Set(['BTCUSDT']);
 
 export class BotManager {
   readonly symbolManager: SymbolManager;
@@ -31,12 +38,19 @@ export class BotManager {
     this.observerManager.createObservers(symbols);
     await this.preloadObservers(symbols);
 
+    this.observerManager.on('pivot', (pivot: PivotEvent) => {
+      if (!ZIGZAG_ENABLED_SYMBOLS.has(pivot.symbol)) return;
+      if (pivot.type === 'min') {
+        const quoteVolume24h = this.observerManager.getQuoteVolume24h(pivot.symbol) ?? 0;
+        this.orderManager.buy(pivot.symbol, pivot.price, quoteVolume24h);
+      } else {
+        this.orderManager.sellAtPrice(pivot.symbol, pivot.price);
+      }
+    });
+
     this.ws = new BinanceWebSocket(symbols);
     this.ws.on('candle', candle => {
       this.observerManager.updateCandle(candle);
-      if (candle.timeframe === '1s') {
-        this.orderManager.onPriceTick(candle.symbol, candle.close);
-      }
     });
     this.ws.connect();
   }

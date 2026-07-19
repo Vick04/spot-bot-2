@@ -3,8 +3,7 @@ import { ActiveOrder, CompletedOrder, OrderStatus } from '../types';
 import { computeOrderSize, OrderSizeConfig } from '../utils/orderSize';
 
 const INITIAL_BALANCE = 10_000;
-const FEE = 0.001;            // 0.1% on buy (asset) and sell (usdt)
-const TARGET_PCT = 0.005;     // +0.5% sell target (added, not multiplied, to avoid FP drift e.g. 100*1.005 !== 100.5)
+const FEE = 0.001; // 0.1% on buy (asset) and sell (usdt)
 const ORDER_SIZE_CONFIG: OrderSizeConfig = { factor: 0.0001, maxUsdt: 10_000 };
 
 export class OrderManager extends EventEmitter {
@@ -28,30 +27,30 @@ export class OrderManager extends EventEmitter {
 
     const rawQuantity = orderSize / price;
     const quantity = rawQuantity * (1 - FEE);
-    const targetPrice = price + price * TARGET_PCT;
 
     this.balance -= orderSize;
     const order: ActiveOrder = {
       symbol,
       buyPrice: price,
-      targetPrice,
       quantity,
       usdtSpent: orderSize,
       openedAt: Date.now(),
     };
     this.activeOrders.set(symbol, order);
 
-    console.log(`[Order] BUY  ${symbol} @ ${price} | size: ${orderSize.toFixed(2)} USDT | qty: ${quantity.toFixed(6)} | target: ${targetPrice.toFixed(8)}`);
+    console.log(`[Order] BUY  ${symbol} @ ${price} | size: ${orderSize.toFixed(2)} USDT | qty: ${quantity.toFixed(6)}`);
     this.emit('opened', { order, balance: this.balance });
     return order;
   }
 
-  onPriceTick(symbol: string, price: number): void {
+  /** Closes the active order for `symbol` at `price` -- called when the
+   * Observer's ZigZag detector confirms a máximo, replacing the old
+   * price-target check. No-op if there's no active order (nothing to
+   * sell) -- same guard the old onPriceTick had. */
+  sellAtPrice(symbol: string, price: number): void {
     const order = this.activeOrders.get(symbol);
     if (!order) return;
-    if (price >= order.targetPrice) {
-      this.complete(order, price);
-    }
+    this.complete(order, price);
   }
 
   getStatus(): OrderStatus {

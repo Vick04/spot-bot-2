@@ -12,7 +12,6 @@ test('buy opens an active order sized by computeOrderSize, deducting balance', (
   assert.equal(order!.symbol, 'BTCUSDT');
   assert.equal(order!.buyPrice, 100);
   assert.equal(order!.usdtSpent, 10_000); // capped by MAX_ORDER_USDT
-  assert.equal(order!.targetPrice, 100.5); // +0.5%
   assert.ok(manager.hasActiveOrder('BTCUSDT'));
   assert.equal(manager.getStatus().balance, 0); // 10_000 initial - 10_000 spent
 });
@@ -47,24 +46,17 @@ test('multiple symbols can have concurrent active orders', () => {
   assert.equal(manager.getStatus().activeOrders.length, 2);
 });
 
-test('onPriceTick does nothing for a symbol with no active order', () => {
+test('sellAtPrice does nothing for a symbol with no active order', () => {
   const manager = new OrderManager();
-  manager.onPriceTick('BTCUSDT', 1000);
+  manager.sellAtPrice('BTCUSDT', 1000);
   assert.equal(manager.getStatus().activeOrders.length, 0);
-});
-
-test('onPriceTick below target leaves the order active', () => {
-  const manager = new OrderManager();
-  manager.buy('BTCUSDT', 100, HIGH_VOLUME); // target = 100.5
-  manager.onPriceTick('BTCUSDT', 100.4);
-  assert.ok(manager.hasActiveOrder('BTCUSDT'));
   assert.equal(manager.getStatus().completedCount, 0);
 });
 
-test('onPriceTick at or above target completes the order and credits balance', () => {
+test('sellAtPrice closes the order at the given price and credits balance', () => {
   const manager = new OrderManager();
-  manager.buy('BTCUSDT', 100, HIGH_VOLUME); // spends 10_000, target 100.5
-  manager.onPriceTick('BTCUSDT', 100.5);
+  manager.buy('BTCUSDT', 100, HIGH_VOLUME);
+  manager.sellAtPrice('BTCUSDT', 105);
 
   assert.equal(manager.hasActiveOrder('BTCUSDT'), false);
   const status = manager.getStatus();
@@ -73,22 +65,33 @@ test('onPriceTick at or above target completes the order and credits balance', (
   assert.ok(status.balance > 0); // got usdtReceived back
 });
 
+test('sellAtPrice can close at a price below the buy price (a loss) -- no protection, activation only', () => {
+  const manager = new OrderManager();
+  manager.buy('BTCUSDT', 100, HIGH_VOLUME);
+  manager.sellAtPrice('BTCUSDT', 90);
+
+  assert.equal(manager.hasActiveOrder('BTCUSDT'), false);
+  const status = manager.getStatus();
+  assert.equal(status.completedCount, 1);
+  assert.ok(status.totalProfitPct < 0, `expected a loss, got ${status.totalProfitPct}`);
+});
+
 test('totalProfitPct is 0 with no completed orders, and reflects profit/invested once one completes', () => {
   const manager = new OrderManager();
   assert.equal(manager.getStatus().totalProfitPct, 0);
 
   manager.buy('BTCUSDT', 100, HIGH_VOLUME);
-  manager.onPriceTick('BTCUSDT', 100.5);
+  manager.sellAtPrice('BTCUSDT', 100.5);
 
   const status = manager.getStatus();
-  // ~0.5% target minus ~0.2% round-trip fees ≈ +0.3%
+  // ~0.5% price move minus ~0.2% round-trip fees ≈ +0.3%
   assert.ok(status.totalProfitPct > 0.2 && status.totalProfitPct < 0.4, `expected ~0.3%, got ${status.totalProfitPct}`);
 });
 
 test('a symbol can be bought again once its previous order completes', () => {
   const manager = new OrderManager();
   manager.buy('BTCUSDT', 100, HIGH_VOLUME);
-  manager.onPriceTick('BTCUSDT', 100.5);
+  manager.sellAtPrice('BTCUSDT', 100.5);
 
   const second = manager.buy('BTCUSDT', 200, HIGH_VOLUME);
   assert.ok(second !== null);
@@ -107,7 +110,7 @@ test('emits opened and completed events with the expected payload shape', () => 
   assert.equal(openedPayloads[0].order.symbol, 'BTCUSDT');
   assert.equal(typeof openedPayloads[0].balance, 'number');
 
-  manager.onPriceTick('BTCUSDT', 100.5);
+  manager.sellAtPrice('BTCUSDT', 100.5);
   assert.equal(completedPayloads.length, 1);
   assert.equal(completedPayloads[0].order.symbol, 'BTCUSDT');
   assert.equal(typeof completedPayloads[0].balance, 'number');
