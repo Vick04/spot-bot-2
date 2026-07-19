@@ -40,11 +40,21 @@ export class BotManager {
 
     this.observerManager.on('pivot', (pivot: PivotEvent) => {
       if (!ZIGZAG_ENABLED_SYMBOLS.has(pivot.symbol)) return;
+
+      // A pivot only confirms after price has already retraced >=1% and
+      // >=20 candles have passed since pivot.price's historical extreme, so
+      // pivot.price is stale by the time this fires -- trading at it would
+      // book a look-ahead-bias edge that's unreachable in live trading.
+      // Execute at the current market price instead; pivot.price remains
+      // available for logging/display only.
+      const currentPrice = this.observerManager.getCurrentPrice(pivot.symbol);
+      if (currentPrice === null) return;
+
       if (pivot.type === 'min') {
         const quoteVolume24h = this.observerManager.getQuoteVolume24h(pivot.symbol) ?? 0;
-        this.orderManager.buy(pivot.symbol, pivot.price, quoteVolume24h);
+        this.orderManager.buy(pivot.symbol, currentPrice, quoteVolume24h);
       } else {
-        this.orderManager.sellAtPrice(pivot.symbol, pivot.price);
+        this.orderManager.sellAtPrice(pivot.symbol, currentPrice);
       }
     });
 
