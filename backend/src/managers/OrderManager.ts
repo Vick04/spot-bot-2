@@ -4,19 +4,35 @@ import { computeOrderSize, OrderSizeConfig } from '../utils/orderSize';
 
 const INITIAL_BALANCE = 10_000;
 const FEE = 0.001; // 0.1% on buy (asset) and sell (usdt)
-const ORDER_SIZE_CONFIG: OrderSizeConfig = { factor: 0.0001, maxUsdt: 10_000 };
+const DEFAULT_ORDER_SIZE_CONFIG: OrderSizeConfig = { factor: 0.0001, maxUsdt: 10_000 };
 
 export class OrderManager extends EventEmitter {
   private balance: number = INITIAL_BALANCE;
   private activeOrders: Map<string, ActiveOrder> = new Map();
   private completedOrders: CompletedOrder[] = [];
+  private clock: () => number;
+  private orderSizeConfig: OrderSizeConfig;
+
+  /** `clock`/`orderSizeConfig` default to today's production values (real
+   * wall-clock time, $10,000-liquidity-capped sizing) -- only the emulator
+   * (a separate module) ever passes non-default values, to get historical
+   * timestamps and all-in compounding sizing during a backtest without
+   * changing live behavior. */
+  constructor(
+    clock: () => number = () => Date.now(),
+    orderSizeConfig: OrderSizeConfig = DEFAULT_ORDER_SIZE_CONFIG
+  ) {
+    super();
+    this.clock = clock;
+    this.orderSizeConfig = orderSizeConfig;
+  }
 
   hasActiveOrder(symbol: string): boolean {
     return this.activeOrders.has(symbol);
   }
 
   computeOrderSize(quoteVolume24h: number): number {
-    return computeOrderSize(this.balance, quoteVolume24h, ORDER_SIZE_CONFIG);
+    return computeOrderSize(this.balance, quoteVolume24h, this.orderSizeConfig);
   }
 
   buy(symbol: string, price: number, quoteVolume24h: number): ActiveOrder | null {
@@ -34,7 +50,7 @@ export class OrderManager extends EventEmitter {
       buyPrice: price,
       quantity,
       usdtSpent: orderSize,
-      openedAt: Date.now(),
+      openedAt: this.clock(),
     };
     this.activeOrders.set(symbol, order);
 
@@ -67,7 +83,7 @@ export class OrderManager extends EventEmitter {
     const usdtReceived = rawUsdt * (1 - FEE);
     const profit = usdtReceived - order.usdtSpent;
     const profitPct = (profit / order.usdtSpent) * 100;
-    const closedAt = Date.now();
+    const closedAt = this.clock();
 
     const completed: CompletedOrder = {
       ...order,

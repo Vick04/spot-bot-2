@@ -117,3 +117,46 @@ test('emits opened and completed events with the expected payload shape', () => 
   assert.equal(completedPayloads[0].completedCount, 1);
   assert.equal(typeof completedPayloads[0].totalProfitPct, 'number');
 });
+
+test('an injected clock is used for openedAt/closedAt/durationMs instead of Date.now()', () => {
+  let simTime = 1000;
+  const manager = new OrderManager(() => simTime);
+
+  const order = manager.buy('BTCUSDT', 100, HIGH_VOLUME);
+  assert.equal(order!.openedAt, 1000);
+
+  const completedPayloads: Array<{ order: { closedAt: number; durationMs: number } }> = [];
+  manager.on('completed', (payload) => { completedPayloads.push(payload); });
+
+  simTime = 5000;
+  manager.sellAtPrice('BTCUSDT', 105);
+
+  assert.equal(completedPayloads.length, 1);
+  assert.equal(completedPayloads[0].order.closedAt, 5000);
+  assert.equal(completedPayloads[0].order.durationMs, 4000);
+});
+
+test('an injected orderSizeConfig with maxUsdt=Infinity sizes at the full balance even above $10,000 (compounding)', () => {
+  const manager = new OrderManager(() => Date.now(), { factor: Number.MAX_SAFE_INTEGER, maxUsdt: Infinity });
+
+  // First trade: full $10,000 balance in, a profitable close grows balance well above $10,000.
+  manager.buy('BTCUSDT', 100, 1);
+  manager.sellAtPrice('BTCUSDT', 200);
+
+  const grownBalance = manager.getStatus().balance;
+  assert.equal(grownBalance, 19960.02); // (10000/100)*0.999 * 200 * 0.999
+  assert.ok(grownBalance > 10_000, `expected balance to grow above 10,000, got ${grownBalance}`);
+
+  const second = manager.buy('BTCUSDT', 100, 1);
+  assert.equal(second!.usdtSpent, grownBalance); // uses the FULL grown balance, not capped at 10,000
+});
+
+test('the default constructor (no arguments) still behaves exactly as before', () => {
+  const manager = new OrderManager();
+  const before = Date.now();
+  const order = manager.buy('BTCUSDT', 100, HIGH_VOLUME);
+  const after = Date.now();
+
+  assert.ok(order!.openedAt >= before && order!.openedAt <= after); // real wall-clock time
+  assert.equal(order!.usdtSpent, 10_000); // still capped at the default $10,000
+});
