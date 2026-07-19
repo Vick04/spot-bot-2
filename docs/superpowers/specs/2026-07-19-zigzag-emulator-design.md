@@ -41,11 +41,12 @@ and always passes a nonzero `quoteVolume24h` (e.g. `1`) to `buy()`. Since `compu
 
 ### Synthetic 1s price feed (keeps `getCurrentPrice()` valid)
 
-Production's `BotManager` reacts to a `'pivot'` event by buying/selling at `observerManager.getCurrentPrice(symbol)` — the live 1s-ticker price, not the pivot's own (stale-by-construction) price. The CSV history has no 1s data, only 1m/1h OHLC bars. To keep the emulator's pivot-handling glue structurally identical to `BotManager`'s (same method call, same null-guard, no special-cased "use candle.close instead" branch), the emulator feeds a synthetic 1s candle with `close` equal to the just-processed candle's `close` immediately after each real candle:
+Production's `BotManager` reacts to a `'pivot'` event by buying/selling at `observerManager.getCurrentPrice(symbol)` — the live 1s-ticker price, not the pivot's own (stale-by-construction) price. The CSV history has no 1s data, only 1m/1h OHLC bars. To keep the emulator's pivot-handling glue structurally identical to `BotManager`'s (same method call, same null-guard, no special-cased "use candle.close instead" branch), the emulator feeds a synthetic 1s candle with `close` equal to the *about-to-be-processed* candle's `close`, **before** that real candle's update:
 ```ts
 observerManager.updateCandle({ symbol, timeframe: '1s', openTime: candle.openTime, open: candle.close, high: candle.close, low: candle.close, close: candle.close, isClosed: true });
+observerManager.updateCandle(candle);
 ```
-This is fed *after* the real candle update (so any `'pivot'` event already fired and `getCurrentPrice()` will resolve to the correct value once the handler runs — Node's `EventEmitter` calls listeners synchronously, so by the time this line runs, the `'pivot'` handler for this candle has already completed). `Observer.currentPrice` becomes valid before the next candle is processed, matching production's behavior of `currentPrice` almost always reflecting something very close to the last close by the time a candle finishes.
+The ordering matters: Node's `EventEmitter` calls listeners synchronously, so if this candle's own update confirms a pivot, the `'pivot'` handler runs *during* the `observerManager.updateCandle(candle)` call, before that call returns. If the synthetic tick were fed *after* instead, `getCurrentPrice()` would still resolve to the *previous* candle's close at the moment the handler runs — an off-by-one that was caught by independently executing this exact code against a hand-verified fixture before finalizing the implementation plan (see `docs/superpowers/plans/2026-07-19-zigzag-emulator.md`). Feeding the tick first ensures `Observer.currentPrice` already reflects this candle's own close by the time any pivot it confirms is handled.
 
 ### Single symbol per run, structured for future multi-symbol
 
@@ -89,7 +90,7 @@ export interface EmulatorResult {
 1. For each symbol: create an `Observer`/`ObserverManager` pair configured with `options.zigzagConfig`/`options.timeframe`; create one shared all-in-configured `OrderManager` with a simulated clock (`{ time: 0 }` object, `clock = () => simClock.time`).
 2. Listen for `ObserverManager`'s `'pivot'` event exactly like `BotManager` does live — `'min'` → `orderManager.buy(symbol, currentPrice, 1)`, `'max'` → `orderManager.sellAtPrice(symbol, currentPrice)` — using `observerManager.getCurrentPrice(symbol)`, skipping if `null`.
 3. Listen for `OrderManager`'s `'completed'` event to accumulate `EmulatorTrade` records and update a running peak-balance tracker for `maxDrawdownPct` (`(peak - balance) / peak * 100`, keep the maximum over the run).
-4. Stream the symbol's `{timeframe}` CSV file candle-by-candle (see below), updating `simClock.time = candle.openTime` before each `observerManager.updateCandle(candle)` call, then feeding the synthetic 1s candle described above.
+4. Stream the symbol's `{timeframe}` CSV file candle-by-candle (see below), updating `simClock.time = candle.openTime`, feeding the synthetic 1s candle described above, and only then calling `observerManager.updateCandle(candle)` for the real candle.
 5. After the stream ends: if `orderManager.getStatus().activeOrders.length > 0`, increment `discardedOpenOrders` per symbol and do not include it in `trades` or final balance adjustments (its `usdtSpent` was already deducted from balance when opened — that's an accurate reflection of "this capital was tied up and its outcome is unknown," left as-is, not refunded).
 6. Return the aggregated `EmulatorResult`.
 
