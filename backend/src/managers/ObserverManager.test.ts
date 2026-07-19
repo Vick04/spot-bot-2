@@ -7,12 +7,12 @@ function closedCandleAt(openTime: number, close: number): Candle {
   return { symbol: 'BTCUSDT', timeframe: '1m', openTime, open: close, high: close, low: close, close, isClosed: true };
 }
 
-/** Same 20-candle window shape as Observer.test.ts's stepWindow: 10 closes
- * at 90, 9 closes at 100, then `last`, with ascending openTime starting at
- * `startAt`. last=70 crosses step1 (<= lower) without reset; a further
- * single close of 100 right after crosses step2 (>= middle) without reset. */
-function stepWindow(startAt: number, last: number): Candle[] {
-  const closes = Array(10).fill(90).concat(Array(9).fill(100)).concat([last]);
+/** Same 26-candle cold-start-confirms-MAX sequence verified in
+ * backend/src/utils/zigzag.test.ts and backend/src/observers/Observer.test.ts:
+ * seed at 110, then 25 candles declining by 0.1 each. The confirming candle
+ * is index 20 (0-indexed) -- indices 0-19 do NOT confirm anything yet. */
+function coldStartMaxSequence(startAt: number): Candle[] {
+  const closes = [110, ...Array.from({ length: 25 }, (_, k) => +(110 - 0.1 * (k + 1)).toFixed(2))];
   return closes.map((close, i) => closedCandleAt(startAt + i, close));
 }
 
@@ -22,98 +22,71 @@ function listenSignals(manager: ObserverManager): ObserverState[] {
   return signals;
 }
 
-test('a candle close that sets step1 from nothing emits signal', () => {
+function listenPivots(manager: ObserverManager): Array<{ symbol: string; type: string; price: number }> {
+  const pivots: Array<{ symbol: string; type: string; price: number }> = [];
+  manager.on('pivot', (p: { symbol: string; type: string; price: number }) => pivots.push(p));
+  return pivots;
+}
+
+test('candles before confirmation emit neither signal nor pivot', () => {
   const manager = new ObserverManager();
   manager.createObserver('BTCUSDT');
   const signals = listenSignals(manager);
+  const pivots = listenPivots(manager);
 
-  // Preload the first 19 candles (below the 20-candle window threshold, so
-  // the state machine is a no-op) via individual updateCandle calls so the
-  // final close goes through updateCandle() (and thus the emit gate).
-  const window = stepWindow(0, 70);
-  window.slice(0, -1).forEach(c => manager.updateCandle(c));
+  const sequence = coldStartMaxSequence(0);
+  sequence.slice(0, 20).forEach(c => manager.updateCandle(c)); // up to (not including) the confirming candle
+
   assert.equal(signals.length, 0);
+  assert.equal(pivots.length, 0);
+});
 
-  const last = window[window.length - 1];
-  manager.updateCandle(last);
+test('the candle that confirms a pivot emits both signal and pivot', () => {
+  const manager = new ObserverManager();
+  manager.createObserver('BTCUSDT');
+
+  const sequence = coldStartMaxSequence(0);
+  sequence.slice(0, 20).forEach(c => manager.updateCandle(c));
+
+  const signals = listenSignals(manager);
+  const pivots = listenPivots(manager);
+
+  manager.updateCandle(sequence[20]); // the confirming candle
+
+  assert.equal(signals.length, 1);
+  assert.deepEqual(signals[0].zigzag.lastPivot, { price: 110, type: 'max' });
+
+  assert.equal(pivots.length, 1);
+  assert.deepEqual(pivots[0], { symbol: 'BTCUSDT', type: 'max', price: 110 });
+});
+
+test('a further candle that does not confirm a new pivot emits neither event again', () => {
+  const manager = new ObserverManager();
+  manager.createObserver('BTCUSDT');
+  coldStartMaxSequence(0).forEach(c => manager.updateCandle(c)); // full sequence, already confirmed
+
+  const signals = listenSignals(manager);
+  const pivots = listenPivots(manager);
 
   const state = manager.getObserverState('BTCUSDT')!;
-  assert.equal(state.reasons.m1.step1, true);
-  assert.equal(state.reasons.m1.step2, false);
-  assert.equal(signals.length, 1);
-  assert.equal(signals[0].reasons.m1.step1, true);
-});
+  manager.updateCandle(closedCandleAt(26, state.zigzag.extremePrice)); // exactly at the extreme -- extends, doesn't confirm
 
-test('a candle close that advances step1->step2 (qualifies unchanged) still emits signal', () => {
-  const manager = new ObserverManager();
-  manager.createObserver('BTCUSDT');
-
-  // Reach step1=true, step2=false first (qualifies already true at this point).
-  const window = stepWindow(0, 70);
-  window.forEach(c => manager.updateCandle(c));
-
-  const beforeState = manager.getObserverState('BTCUSDT')!;
-  assert.equal(beforeState.reasons.m1.step1, true);
-  assert.equal(beforeState.reasons.m1.step2, false);
-  assert.equal(beforeState.qualifies, true);
-
-  const signals = listenSignals(manager);
-
-  // One more close (openTime 20, close 100) slides the window forward by
-  // one and crosses the middle band without crossing the upper band,
-  // setting step2 while qualifies stays true throughout.
-  manager.updateCandle(closedCandleAt(20, 100));
-
-  const afterState = manager.getObserverState('BTCUSDT')!;
-  assert.equal(afterState.reasons.m1.step1, true);
-  assert.equal(afterState.reasons.m1.step2, true);
-  assert.equal(afterState.qualifies, true);
-  assert.equal(afterState.qualifies, beforeState.qualifies); // qualifies did NOT change...
-
-  // ...yet signal must still fire, because reasons changed.
-  assert.equal(signals.length, 1);
-  assert.equal(signals[0].reasons.m1.step2, true);
-});
-
-test('a candle close where nothing changes does not emit signal', () => {
-  const manager = new ObserverManager();
-  manager.createObserver('BTCUSDT');
-
-  // Reach step1=true, step2=true so the state machine is settled.
-  const window = stepWindow(0, 70);
-  window.forEach(c => manager.updateCandle(c));
-  manager.updateCandle(closedCandleAt(20, 100));
-
-  const settled = manager.getObserverState('BTCUSDT')!;
-  assert.equal(settled.reasons.m1.step1, true);
-  assert.equal(settled.reasons.m1.step2, true);
-
-  const signals = listenSignals(manager);
-
-  // Another close inside the band (doesn't touch upper, lower, or middle
-  // relative to step1/step2's already-true state) leaves reasons unchanged.
-  manager.updateCandle(closedCandleAt(21, 100));
-
-  const after = manager.getObserverState('BTCUSDT')!;
-  assert.deepEqual(after.reasons, settled.reasons);
   assert.equal(signals.length, 0);
+  assert.equal(pivots.length, 0);
 });
 
-test('a closed 1h candle emits signal even when reasons and step state are unchanged', () => {
+test('a closed 1h candle emits signal even when zigzag does not change (performance-only update)', () => {
   const manager = new ObserverManager();
   manager.createObserver('BTCUSDT');
   const signals = listenSignals(manager);
 
-  // A single 1h close: reasons stay {false,false} (below the 20-candle
-  // signals window), but performance is recomputed from the 1h buffer on
-  // every 1h close, so the broadcast must still fire.
   manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 0, open: 100, high: 100, low: 100, close: 100, isClosed: true });
 
   assert.equal(signals.length, 1);
-  assert.deepEqual(signals[0].reasons, { m1: { step1: false, step2: false }, h1: { step1: false, step2: false } });
+  assert.equal(signals[0].zigzag.direction, null); // 1h close doesn't touch zigzag (configured timeframe is 1m)
 });
 
-test('a second closed 1h candle also emits, not just the first', () => {
+test('a second closed 1h candle also emits, carrying the updated performance', () => {
   const manager = new ObserverManager();
   manager.createObserver('BTCUSDT');
   manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 0, open: 100, high: 100, low: 100, close: 100, isClosed: true });
@@ -133,4 +106,19 @@ test('a non-closed (forming) 1h candle does not emit on its own', () => {
   manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: 0, open: 100, high: 100, low: 100, close: 100, isClosed: false });
 
   assert.equal(signals.length, 0);
+});
+
+test('chart:closed fires even for a symbol that has never confirmed a pivot (no qualification gate anymore)', () => {
+  const manager = new ObserverManager();
+  manager.createObserver('BTCUSDT');
+
+  const chartClosedEvents: unknown[] = [];
+  manager.on('chart:closed', payload => chartClosedEvents.push(payload));
+
+  // A single closed 1m candle: nowhere near enough history for any zigzag
+  // pivot, yet chart:closed must still fire -- charts are no longer gated
+  // on a qualification concept this feature removed entirely.
+  manager.updateCandle(closedCandleAt(0, 100));
+
+  assert.equal(chartClosedEvents.length, 1);
 });

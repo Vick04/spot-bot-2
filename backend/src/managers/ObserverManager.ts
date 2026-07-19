@@ -44,42 +44,42 @@ export class ObserverManager extends EventEmitter {
     }
 
     const state = observer.getState();
-    // Compare all four step booleans, not just `qualifies` (which is their
-    // OR): qualifies can stay true across a step1->step2 transition (step2
-    // only ever sets while step1 is already true), so gating on it alone
-    // misses the "Watching" -> "Ready" update the frontend depends on.
-    const reasonsChanged =
-      state.reasons.m1.step1 !== before.reasons.m1.step1 ||
-      state.reasons.m1.step2 !== before.reasons.m1.step2 ||
-      state.reasons.h1.step1 !== before.reasons.h1.step1 ||
-      state.reasons.h1.step2 !== before.reasons.h1.step2;
-    // Performance windows are recomputed on every closed 1h candle (see
-    // Observer.updateCandle1h) even when step1/step2 don't change — the
-    // broadcast must fire on that trigger unconditionally too, otherwise
-    // performance on the frontend would only refresh on step transitions.
+
+    // Reference inequality (not value equality) is the correct "did a new
+    // pivot get confirmed on THIS candle" check: nextZigZagState() only
+    // ever constructs a fresh `lastPivot` object inside its confirm
+    // branches, so the object reference only changes exactly when a new
+    // confirmation fires -- never on an "extending" or "no-op" update.
+    const pivotChanged = state.zigzag.lastPivot !== null && state.zigzag.lastPivot !== before.zigzag.lastPivot;
+    // Performance windows are recomputed on every closed 1h candle even
+    // when zigzag doesn't change -- the broadcast must fire on that
+    // trigger too, otherwise performance on the frontend would only
+    // refresh on pivot confirmations.
     const is1hClose = candle.timeframe === '1h' && candle.isClosed;
-    if (reasonsChanged || is1hClose) {
-      this.emit('signal', state);
+
+    if (pivotChanged || is1hClose) {
+      this.emit('signal', state); // UI-facing: unchanged shape, new trigger condition
+    }
+    if (pivotChanged) {
+      this.emit('pivot', { symbol: candle.symbol, type: state.zigzag.lastPivot!.type, price: state.zigzag.lastPivot!.price }); // trading-facing
     }
 
-    if (state.qualifies) {
-      const m1 = this.getLatestChartPoint(candle.symbol, '1m');
-      const h1 = this.getLatestChartPoint(candle.symbol, '1h');
+    const m1 = this.getLatestChartPoint(candle.symbol, '1m');
+    const h1 = this.getLatestChartPoint(candle.symbol, '1h');
 
-      if (!candle.isClosed && m1 && h1) {
-        this.emit('chart:tick', { symbol: candle.symbol, m1, h1 });
-      }
+    if (!candle.isClosed && m1 && h1) {
+      this.emit('chart:tick', { symbol: candle.symbol, m1, h1 });
+    }
 
-      if (candle.isClosed && (candle.timeframe === '1m' || candle.timeframe === '1h')) {
-        const point = candle.timeframe === '1m' ? m1 : h1;
-        if (point) {
-          this.emit('chart:closed', {
-            symbol: candle.symbol,
-            timeframe: candle.timeframe,
-            candle: point.candle,
-            series: point.series,
-          });
-        }
+    if (candle.isClosed && (candle.timeframe === '1m' || candle.timeframe === '1h')) {
+      const point = candle.timeframe === '1m' ? m1 : h1;
+      if (point) {
+        this.emit('chart:closed', {
+          symbol: candle.symbol,
+          timeframe: candle.timeframe,
+          candle: point.candle,
+          series: point.series,
+        });
       }
     }
   }
@@ -90,10 +90,6 @@ export class ObserverManager extends EventEmitter {
 
   getObserverState(symbol: string): ObserverState | null {
     return this.observers.get(symbol)?.getState() ?? null;
-  }
-
-  getQualifyingSymbols(): string[] {
-    return this.getAllStates().filter(s => s.qualifies).map(s => s.symbol);
   }
 
   /** Last 100 candles + index-aligned indicator series for `symbol`/`timeframe`.
