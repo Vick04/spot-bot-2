@@ -1,11 +1,19 @@
-export interface TimeframeSignal {
-  step1: boolean;
-  step2: boolean;
+export type PivotType = 'min' | 'max';
+
+export interface Pivot {
+  price: number;
+  type: PivotType;
 }
 
-export interface SignalReasons {
-  m1: TimeframeSignal;
-  h1: TimeframeSignal;
+export interface ZigZagState {
+  direction: 'up' | 'down' | null;
+  pendingHigh: number;
+  pendingHighBars: number;
+  pendingLow: number;
+  pendingLowBars: number;
+  extremePrice: number;
+  barsSinceExtreme: number;
+  lastPivot: Pivot | null;
 }
 
 export interface PerformanceWindows {
@@ -18,9 +26,8 @@ export interface PerformanceWindows {
 
 export interface ObserverData {
   symbol: string;
-  qualifies: boolean;
-  reasons: SignalReasons;
   performance: PerformanceWindows;
+  zigzag: ZigZagState;
 }
 
 export interface ApiResponse<T> {
@@ -74,7 +81,6 @@ export interface ChartClosedEvent {
 export interface ActiveOrder {
   symbol: string;
   buyPrice: number;
-  targetPrice: number;
   quantity: number;
   usdtSpent: number;
   openedAt: number;
