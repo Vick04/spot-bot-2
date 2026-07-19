@@ -17,14 +17,35 @@ export interface CandleData {
   timestamp: number;
 }
 
-export interface TimeframeSignal {
-  step1: boolean;
-  step2: boolean;
+export type PivotType = 'min' | 'max';
+
+export interface Pivot {
+  price: number;
+  type: PivotType;
 }
 
-export interface SignalReasons {
-  m1: TimeframeSignal;
-  h1: TimeframeSignal;
+export interface ZigZagState {
+  direction: 'up' | 'down' | null;
+  // Cold-start only (direction === null): two independent running
+  // candidates tracked simultaneously until one deviates enough to decide
+  // the initial direction. Meaningless once direction is set.
+  pendingHigh: number;
+  pendingHighBars: number;
+  pendingLow: number;
+  pendingLowBars: number;
+  // Meaningful once direction !== null:
+  extremePrice: number;
+  barsSinceExtreme: number;
+  lastPivot: Pivot | null;
+}
+
+/** Emitted by ObserverManager when a symbol's ZigZag detector confirms a
+ * new pivot on this exact candle close — the trading-facing signal
+ * BotManager listens to (distinct from the UI-facing 'signal' event). */
+export interface PivotEvent {
+  symbol: string;
+  type: PivotType;
+  price: number;
 }
 
 export interface PerformanceWindows {
@@ -37,9 +58,8 @@ export interface PerformanceWindows {
 
 export interface ObserverState {
   symbol: string;
-  qualifies: boolean;
-  reasons: SignalReasons;
   performance: PerformanceWindows;
+  zigzag: ZigZagState;
 }
 
 export type ChartTimeframe = '1m' | '1h';
@@ -89,7 +109,6 @@ export interface ChartClosedEvent {
 export interface ActiveOrder {
   symbol: string;
   buyPrice: number;
-  targetPrice: number;
   quantity: number;
   usdtSpent: number;
   openedAt: number;
