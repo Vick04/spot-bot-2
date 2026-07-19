@@ -10,6 +10,7 @@ import {
   ObserverState,
 } from '../types';
 import { computeChartSeries } from '../utils/chartSeries';
+import { ZigZagConfig } from '../utils/zigzag';
 
 /** REST/initial chart snapshots and the sliding client-side window both use
  * the last 100 candles; the Observer buffer (200 candles) holds more so
@@ -19,14 +20,16 @@ const CHART_VISIBLE_CANDLES = 100;
 export class ObserverManager extends EventEmitter {
   private observers: Map<string, Observer> = new Map();
 
-  createObserver(symbol: string): void {
+  /** `zigzagConfig`/`zigzagTimeframe` are forwarded to `new Observer(...)`
+   * unchanged (both optional there too) -- only the emulator passes them. */
+  createObserver(symbol: string, zigzagConfig?: ZigZagConfig, zigzagTimeframe?: ChartTimeframe): void {
     if (!this.observers.has(symbol)) {
-      this.observers.set(symbol, new Observer(symbol));
+      this.observers.set(symbol, new Observer(symbol, zigzagConfig, zigzagTimeframe));
     }
   }
 
-  createObservers(symbols: string[]): void {
-    symbols.forEach(symbol => this.createObserver(symbol));
+  createObservers(symbols: string[], zigzagConfig?: ZigZagConfig, zigzagTimeframe?: ChartTimeframe): void {
+    symbols.forEach(symbol => this.createObserver(symbol, zigzagConfig, zigzagTimeframe));
   }
 
   updateCandle(candle: Candle): void {

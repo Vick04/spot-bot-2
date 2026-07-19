@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ObserverManager } from './ObserverManager';
 import { Candle, ObserverState } from '../types';
+import { ZigZagConfig } from '../utils/zigzag';
 
 function closedCandleAt(openTime: number, close: number): Candle {
   return { symbol: 'BTCUSDT', timeframe: '1m', openTime, open: close, high: close, low: close, close, isClosed: true };
@@ -121,4 +122,19 @@ test('chart:closed fires even for a symbol that has never confirmed a pivot (no 
   manager.updateCandle(closedCandleAt(0, 100));
 
   assert.equal(chartClosedEvents.length, 1);
+});
+
+test('createObserver passes a custom zigzagConfig/zigzagTimeframe through to the underlying Observer', () => {
+  const manager = new ObserverManager();
+  const customConfig: ZigZagConfig = { deviationPct: 1, minBarsBetweenPivots: 2, priceSource: 'close' };
+  manager.createObserver('BTCUSDT', customConfig, '1h');
+
+  const decline = Array.from({ length: 15 }, (_, k) => +(110 - 0.2 * (k + 1)).toFixed(2));
+  const closes = [110, ...decline];
+  closes.forEach((close, i) => {
+    manager.updateCandle({ symbol: 'BTCUSDT', timeframe: '1h', openTime: i, open: close, high: close, low: close, close, isClosed: true });
+  });
+
+  const state = manager.getObserverState('BTCUSDT')!;
+  assert.deepEqual(state.zigzag.lastPivot, { price: 110, type: 'max' });
 });

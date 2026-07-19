@@ -1,7 +1,7 @@
 import { Candle, ChartCandle, ChartTimeframe, ObserverState, PerformanceWindows, ZigZagState } from '../types';
 import { Queue } from '../utils/Queue';
 import { computePerformance } from '../utils/performance';
-import { nextZigZagState, EMPTY_ZIGZAG_STATE } from '../utils/zigzag';
+import { nextZigZagState, EMPTY_ZIGZAG_STATE, ZigZagConfig, DEFAULT_ZIGZAG_CONFIG } from '../utils/zigzag';
 
 /** 200 closed candles per timeframe: enough for a 100-candle visible chart
  * window with a full 99-candle MA99 lookback at the first visible point,
@@ -12,12 +12,6 @@ const CHART_HISTORY_CANDLES = 200;
 /** 1 quote-volume value per closed 1m candle, covering a rolling 24h window
  * (60 * 24 = 1440 minutes), used for liquidity-based order sizing. */
 const QUOTE_VOLUME_WINDOW = 1440;
-
-/** Which closed-candle buffer drives the ZigZag pivot detector -- a single
- * global choice (unlike the old per-timeframe step1/step2 system). To be
- * calibrated against real BTC history via the emulator (separate
- * sub-project) before changing this. */
-const ZIGZAG_TIMEFRAME: ChartTimeframe = '1m';
 
 export class Observer {
   private symbol: string;
@@ -30,37 +24,49 @@ export class Observer {
   private currentPrice: number | null = null;
   private performance: PerformanceWindows = computePerformance([]);
   private zigzag: ZigZagState = EMPTY_ZIGZAG_STATE;
+  private zigzagConfig: ZigZagConfig;
+  private zigzagTimeframe: ChartTimeframe;
 
-  constructor(symbol: string) {
+  /** `zigzagConfig`/`zigzagTimeframe` default to today's production values --
+   * only the emulator (a separate module) ever passes non-default values,
+   * to test other parameter combinations against historical data without
+   * changing live behavior. */
+  constructor(
+    symbol: string,
+    zigzagConfig: ZigZagConfig = DEFAULT_ZIGZAG_CONFIG,
+    zigzagTimeframe: ChartTimeframe = '1m'
+  ) {
     this.symbol = symbol;
+    this.zigzagConfig = zigzagConfig;
+    this.zigzagTimeframe = zigzagTimeframe;
     this.closed1m = new Queue<Candle>(CHART_HISTORY_CANDLES);
     this.closed1h = new Queue<Candle>(CHART_HISTORY_CANDLES);
     this.quoteVol1m = new Queue<number>(QUOTE_VOLUME_WINDOW);
   }
 
-  /** Pushes each candle into the 1m chart buffer. If ZIGZAG_TIMEFRAME is
+  /** Pushes each candle into the 1m chart buffer. If `zigzagTimeframe` is
    * '1m', also replays nextZigZagState() candle-by-candle so a freshly
    * started observer reconstructs true pivot state instead of starting
    * cold -- same replay discipline the old step1/step2 system used. */
   preloadClosed1m(candles: Candle[]): void {
     candles.forEach(c => {
       this.closed1m.push(c);
-      if (ZIGZAG_TIMEFRAME === '1m') {
-        this.zigzag = nextZigZagState(c, this.zigzag);
+      if (this.zigzagTimeframe === '1m') {
+        this.zigzag = nextZigZagState(c, this.zigzag, this.zigzagConfig);
       }
     });
   }
 
   /** Same replay discipline as preloadClosed1m, for the 1h buffer -- only
-   * advances the ZigZag detector if ZIGZAG_TIMEFRAME is '1h'. Always
+   * advances the ZigZag detector if `zigzagTimeframe` is '1h'. Always
    * recomputes performance once at the end (performance has no stickiness
    * or history dependency beyond "what's the buffer right now", unlike
    * ZigZag, so it doesn't need a per-candle recompute during replay). */
   preloadClosed1h(candles: Candle[]): void {
     candles.forEach(c => {
       this.closed1h.push(c);
-      if (ZIGZAG_TIMEFRAME === '1h') {
-        this.zigzag = nextZigZagState(c, this.zigzag);
+      if (this.zigzagTimeframe === '1h') {
+        this.zigzag = nextZigZagState(c, this.zigzag, this.zigzagConfig);
       }
     });
     this.performance = computePerformance(this.closed1h.toArray());
@@ -82,8 +88,8 @@ export class Observer {
       this.closed1m.push(candle);
       this.pushQuoteVolume(candle.quoteVolume ?? 0);
       this.form1mCandle = null;
-      if (ZIGZAG_TIMEFRAME === '1m') {
-        this.zigzag = nextZigZagState(candle, this.zigzag);
+      if (this.zigzagTimeframe === '1m') {
+        this.zigzag = nextZigZagState(candle, this.zigzag, this.zigzagConfig);
       }
     } else {
       this.form1mCandle = candle;
@@ -95,8 +101,8 @@ export class Observer {
       this.closed1h.push(candle);
       this.form1hCandle = null;
       this.performance = computePerformance(this.closed1h.toArray());
-      if (ZIGZAG_TIMEFRAME === '1h') {
-        this.zigzag = nextZigZagState(candle, this.zigzag);
+      if (this.zigzagTimeframe === '1h') {
+        this.zigzag = nextZigZagState(candle, this.zigzag, this.zigzagConfig);
       }
     } else {
       this.form1hCandle = candle;

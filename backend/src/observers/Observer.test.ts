@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Observer } from './Observer';
 import { Candle } from '../types';
+import { DEFAULT_ZIGZAG_CONFIG } from '../utils/zigzag';
 
 function closedCandle(openTime: number, open: number, high: number, low: number, close: number): Candle {
   return { symbol: 'BTCUSDT', timeframe: '1m', openTime, open, high, low, close, isClosed: true };
@@ -206,4 +207,41 @@ test('updateCandle1m does not affect performance (1h-buffer-derived only)', () =
   observer.updateCandle1m({ symbol: 'BTCUSDT', timeframe: '1m', openTime: 0, open: 500, high: 500, low: 500, close: 500, isClosed: true });
 
   assert.deepEqual(observer.getState().performance, before);
+});
+
+test('a custom zigzagConfig changes when a pivot confirms (proves config injection reaches nextZigZagState)', () => {
+  const decline = Array.from({ length: 15 }, (_, k) => +(110 - 0.2 * (k + 1)).toFixed(2));
+  const candles = [110, ...decline].map((close, i) => closedCandleAt(i, close));
+
+  const withDefault = new Observer('BTCUSDT');
+  withDefault.preloadClosed1m(candles);
+  assert.equal(withDefault.getState().zigzag.lastPivot, null); // minBarsBetweenPivots=20 never reached in only 16 candles
+
+  const withCustom = new Observer('BTCUSDT', { deviationPct: 1, minBarsBetweenPivots: 2, priceSource: 'close' });
+  withCustom.preloadClosed1m(candles);
+  assert.deepEqual(withCustom.getState().zigzag.lastPivot, { price: 110, type: 'max' });
+});
+
+test('a custom zigzagTimeframe of "1h" drives the zigzag detector from the 1h buffer instead of 1m', () => {
+  const closes = [110, ...Array.from({ length: 25 }, (_, k) => +(110 - 0.1 * (k + 1)).toFixed(2))];
+  const hourCandles = closes.map((close, i) => closedHourAt(i, close));
+
+  const observer = new Observer('BTCUSDT', DEFAULT_ZIGZAG_CONFIG, '1h');
+  observer.preloadClosed1h(hourCandles);
+
+  const zigzag = observer.getState().zigzag;
+  assert.equal(zigzag.direction, 'down');
+  assert.deepEqual(zigzag.lastPivot, { price: 110, type: 'max' });
+});
+
+test('when zigzagTimeframe is "1h", feeding 1m candles does NOT advance the zigzag detector', () => {
+  const closes = [110, ...Array.from({ length: 25 }, (_, k) => +(110 - 0.1 * (k + 1)).toFixed(2))];
+  const minuteCandles = closes.map((close, i) => closedCandleAt(i, close));
+
+  const observer = new Observer('BTCUSDT', DEFAULT_ZIGZAG_CONFIG, '1h');
+  observer.preloadClosed1m(minuteCandles);
+
+  const zigzag = observer.getState().zigzag;
+  assert.equal(zigzag.direction, null);
+  assert.equal(zigzag.lastPivot, null);
 });
