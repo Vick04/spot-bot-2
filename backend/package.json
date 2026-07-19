@@ -6,7 +6,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "node --test --require ts-node/register 'src/**/*.test.ts'"
+    "test": "node --test --require ts-node/register 'src/**/*.test.ts'",
+    "emulate": "ts-node src/emulator/run.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
