@@ -64,7 +64,15 @@ export class ObserverManager extends EventEmitter {
       this.emit('signal', state); // UI-facing: unchanged shape, new trigger condition
     }
     if (pivotChanged) {
-      this.emit('pivot', { symbol: candle.symbol, type: state.zigzag.lastPivot!.type, price: state.zigzag.lastPivot!.price }); // trading-facing
+      // barsSinceExtreme was reset in the new state, but we need the value from the confirmed pivot
+      // In cold-start, direction transitions from null to a direction; use pending*Bars instead
+      let barsSinceExtremePriorToReset = before.zigzag.barsSinceExtreme;
+      if (before.zigzag.direction === null && state.zigzag.direction !== null) {
+        // Cold-start case: pending*Bars are incremented in the current candle before confirmation is checked
+        // So we add 1 to get the actual number of bars since the extremum was set
+        barsSinceExtremePriorToReset = (state.zigzag.lastPivot!.type === 'max' ? before.zigzag.pendingHighBars : before.zigzag.pendingLowBars) + 1;
+      }
+      this.emit('pivot', { symbol: candle.symbol, type: state.zigzag.lastPivot!.type, price: state.zigzag.lastPivot!.price, barsSinceExtreme: barsSinceExtremePriorToReset }); // trading-facing
     }
 
     const m1 = this.getLatestChartPoint(candle.symbol, '1m');

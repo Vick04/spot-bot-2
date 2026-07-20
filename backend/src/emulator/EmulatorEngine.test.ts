@@ -55,10 +55,18 @@ test('runs a full sequence, executing at current price (not the stale pivot pric
 
   const trade = result.trades[0];
   assert.equal(trade.symbol, 'BTCUSDT');
-  assert.equal(trade.buyPrice, 109.1); // current price at the MIN pivot's candle, not the pivot's own 107
-  assert.equal(trade.sellPrice, 107.4); // current price at the MAX pivot's candle, not the pivot's own 109.5
-  assert.equal(trade.buyTime, 51 * 60000);
-  assert.equal(trade.sellTime, 76 * 60000);
+  assert.equal(trade.buyPivotPrice, 107.0); // min pivot price (the actual low)
+  assert.equal(trade.buyPivotTime, 30 * 60000); // when the min occurred
+  assert.equal(trade.buyPrice, 109.1); // execution price at the MIN pivot's confirmation candle
+  assert.equal(trade.buyTime, 51 * 60000); // when the order was placed
+  assert.ok(Math.abs(trade.buySlippagePct - 1.96) < 0.1, `expected buySlippagePct ~1.96, got ${trade.buySlippagePct}`); // (109.1 - 107.0) / 107.0 * 100
+
+  assert.equal(trade.sellPivotPrice, 109.5); // max pivot price (the actual high after the min)
+  assert.equal(trade.sellPivotTime, 55 * 60000); // when the max occurred (candle 55)
+  assert.equal(trade.sellPrice, 107.4); // execution price at the MAX pivot's confirmation candle
+  assert.equal(trade.sellTime, 76 * 60000); // when the order was placed
+  assert.ok(Math.abs(trade.sellSlippagePct - (-1.92)) < 0.1, `expected sellSlippagePct ~-1.92, got ${trade.sellSlippagePct}`); // (107.4 - 109.5) / 109.5 * 100
+
   assert.equal(trade.durationMs, 25 * 60000);
   assert.ok(trade.profitPct < 0, `expected a loss (price dropped from buy to sell), got ${trade.profitPct}`);
 

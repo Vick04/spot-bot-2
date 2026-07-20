@@ -58,7 +58,7 @@ test('the candle that confirms a pivot emits both signal and pivot', () => {
   assert.deepEqual(signals[0].zigzag.lastPivot, { price: 110, type: 'max' });
 
   assert.equal(pivots.length, 1);
-  assert.deepEqual(pivots[0], { symbol: 'BTCUSDT', type: 'max', price: 110 });
+  assert.deepEqual(pivots[0], { symbol: 'BTCUSDT', type: 'max', price: 110, barsSinceExtreme: 20 });
 });
 
 test('a further candle that does not confirm a new pivot emits neither event again', () => {

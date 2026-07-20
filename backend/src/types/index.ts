@@ -46,6 +46,7 @@ export interface PivotEvent {
   symbol: string;
   type: PivotType;
   price: number;
+  barsSinceExtreme: number;
 }
 
 export interface PerformanceWindows {
