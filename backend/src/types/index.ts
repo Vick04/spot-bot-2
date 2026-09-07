@@ -142,3 +142,10 @@ export interface OrderCompletedEvent {
   completedCount: number;
   totalProfitPct: number;
 }
+
+export interface DetectedPivot {
+  symbol: string;
+  type: PivotType;
+  price: number;
+  time: number;
+}

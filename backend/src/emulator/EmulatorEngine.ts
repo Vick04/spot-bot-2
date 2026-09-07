@@ -1,6 +1,6 @@
 import { ObserverManager } from '../managers/ObserverManager';
 import { OrderManager } from '../managers/OrderManager';
-import { ChartTimeframe, CompletedOrder, PivotEvent } from '../types';
+import { ChartTimeframe, CompletedOrder, PivotEvent, DetectedPivot } from '../types';
 import { ZigZagConfig } from '../utils/zigzag';
 import { OrderSizeConfig } from '../utils/orderSize';
 import { readSymbolCandles } from './csvCandleSource';
@@ -37,6 +37,7 @@ export interface EmulatorResult {
   initialBalance: number;
   finalBalance: number;
   trades: EmulatorTrade[];
+  pivots: DetectedPivot[];
   discardedOpenOrders: number;
   maxDrawdownPct: number;
 }
@@ -66,6 +67,7 @@ export class EmulatorEngine {
     let peakBalance = initialBalance;
     let maxDrawdownPct = 0;
     const trades: EmulatorTrade[] = [];
+    const pivots: DetectedPivot[] = [];
     const lastPivots = new Map<string, PivotInfo>(); // Track last min/max pivot per symbol
 
     const timeframeMs = options.timeframe === '1m' ? 60000 : 3600000;
@@ -82,6 +84,9 @@ export class EmulatorEngine {
       // Store pivot info for later use in trade record
       const pivotInfo: PivotInfo = { price: pivot.price, time: pivotTime };
       lastPivots.set(`${pivot.symbol}_${pivot.type}`, pivotInfo);
+
+      // Track all detected pivots
+      pivots.push({ symbol: pivot.symbol, type: pivot.type, price: pivot.price, time: pivotTime });
 
       if (pivot.type === 'min') {
         orderManager.buy(pivot.symbol, currentPrice, ALL_IN_QUOTE_VOLUME);
@@ -168,6 +173,7 @@ export class EmulatorEngine {
       initialBalance,
       finalBalance: orderManager.getStatus().balance,
       trades,
+      pivots,
       discardedOpenOrders,
       maxDrawdownPct,
     };

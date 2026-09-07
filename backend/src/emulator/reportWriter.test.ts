@@ -13,6 +13,7 @@ function baseResult(overrides: Partial<EmulatorResult> = {}): EmulatorResult {
     initialBalance: 10_000,
     finalBalance: 10_000,
     trades: [],
+    pivots: [],
     discardedOpenOrders: 0,
     maxDrawdownPct: 0,
     ...overrides,
@@ -38,8 +39,36 @@ test('computes win rate, average profit, and total return from the trades array'
   const report = formatReport(baseResult({
     finalBalance: 11_000,
     trades: [
-      { symbol: 'BTCUSDT', buyPrice: 100, buyTime: 0, sellPrice: 105, sellTime: 60_000, profitPct: 4.9, durationMs: 60_000 },
-      { symbol: 'BTCUSDT', buyPrice: 100, buyTime: 120_000, sellPrice: 95, sellTime: 180_000, profitPct: -5.1, durationMs: 60_000 },
+      {
+        symbol: 'BTCUSDT',
+        buyPrice: 100,
+        buyTime: 0,
+        buyPivotPrice: 99,
+        buyPivotTime: 0,
+        sellPrice: 105,
+        sellTime: 60_000,
+        sellPivotPrice: 106,
+        sellPivotTime: 50_000,
+        profitPct: 4.9,
+        durationMs: 60_000,
+        buySlippagePct: 1.01,
+        sellSlippagePct: -0.94,
+      },
+      {
+        symbol: 'BTCUSDT',
+        buyPrice: 100,
+        buyTime: 120_000,
+        buyPivotPrice: 101,
+        buyPivotTime: 100_000,
+        sellPrice: 95,
+        sellTime: 180_000,
+        sellPivotPrice: 96,
+        sellPivotTime: 160_000,
+        profitPct: -5.1,
+        durationMs: 60_000,
+        buySlippagePct: -0.99,
+        sellSlippagePct: -1.04,
+      },
     ],
   }));
 
@@ -51,17 +80,56 @@ test('computes win rate, average profit, and total return from the trades array'
 test('renders one table row per trade with formatted price/time/duration', () => {
   const report = formatReport(baseResult({
     trades: [
-      { symbol: 'BTCUSDT', buyPrice: 61234.5, buyTime: 0, sellPrice: 62000, sellTime: 3_600_000, profitPct: 1.25, durationMs: 3_600_000 },
+      {
+        symbol: 'BTCUSDT',
+        buyPrice: 61234.5,
+        buyTime: 3_600_000,
+        buyPivotPrice: 61000,
+        buyPivotTime: 0,
+        sellPrice: 62000,
+        sellTime: 7_200_000,
+        sellPivotPrice: 62500,
+        sellPivotTime: 1_800_000,
+        profitPct: 1.25,
+        durationMs: 3_600_000,
+        buySlippagePct: 0.38,
+        sellSlippagePct: -0.80,
+      },
     ],
   }));
 
+  assert.ok(report.includes('61000.000000'));
   assert.ok(report.includes('61234.500000'));
+  assert.ok(report.includes('62500.000000'));
   assert.ok(report.includes('62000.000000'));
   assert.ok(report.includes('+1.25%'));
+  assert.ok(report.includes('+0.38%')); // buy slippage
+  assert.ok(report.includes('-0.80%')); // sell slippage
   assert.ok(report.includes('1h'));
 });
 
 test('shows the discarded-open-orders count', () => {
   const report = formatReport(baseResult({ discardedOpenOrders: 1 }));
   assert.ok(report.includes('Discarded (still open at end of data): 1'));
+});
+
+test('renders detected pivots section with symbol, type, price, and datetime', () => {
+  const report = formatReport(baseResult({
+    pivots: [
+      { symbol: 'BTCUSDT', type: 'min', price: 50000.123456, time: 1_000_000 },
+      { symbol: 'BTCUSDT', type: 'max', price: 55000.654321, time: 2_000_000 },
+    ],
+  }));
+
+  assert.ok(report.includes('## Detected Pivots'));
+  assert.ok(report.includes('📉 MIN'));
+  assert.ok(report.includes('📈 MAX'));
+  assert.ok(report.includes('50000.123456'));
+  assert.ok(report.includes('55000.654321'));
+});
+
+test('shows placeholder when no pivots are detected', () => {
+  const report = formatReport(baseResult({ pivots: [] }));
+  assert.ok(report.includes('## Detected Pivots'));
+  assert.ok(report.includes('_No pivots detected._'));
 });

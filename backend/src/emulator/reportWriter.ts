@@ -24,8 +24,15 @@ function fmtTime(ms: number): string {
   return new Date(ms).toISOString();
 }
 
+function fmtDateTime(ms: number): string {
+  const d = new Date(ms);
+  const date = d.toISOString().split('T')[0];
+  const time = d.toISOString().split('T')[1].substring(0, 8);
+  return `${date} ${time}`;
+}
+
 export function formatReport(result: EmulatorResult): string {
-  const { options, trades } = result;
+  const { options, trades, pivots } = result;
   const wins = trades.filter(t => t.profitPct > 0).length;
   const losses = trades.filter(t => t.profitPct <= 0).length;
   const winRatePct = trades.length > 0 ? (wins / trades.length) * 100 : 0;
@@ -61,10 +68,24 @@ export function formatReport(result: EmulatorResult): string {
   if (trades.length === 0) {
     lines.push('_No completed trades._');
   } else {
-    lines.push('| # | Buy Time | Buy Price | Sell Time | Sell Price | Profit % | Duration |');
-    lines.push('|---|----------|-----------|-----------|------------|----------|----------|');
+    lines.push('| # | Buy Pivot Time | Buy Pivot Price | Buy Time | Buy Price | Slippage | Sell Pivot Time | Sell Pivot Price | Sell Time | Sell Price | Slippage | Profit % | Duration |');
+    lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
     trades.forEach((t, i) => {
-      lines.push(`| ${i + 1} | ${fmtTime(t.buyTime)} | ${fmtPrice(t.buyPrice)} | ${fmtTime(t.sellTime)} | ${fmtPrice(t.sellPrice)} | ${fmtPct(t.profitPct)} | ${fmtDuration(t.durationMs)} |`);
+      lines.push(`| ${i + 1} | ${fmtTime(t.buyPivotTime)} | ${fmtPrice(t.buyPivotPrice)} | ${fmtTime(t.buyTime)} | ${fmtPrice(t.buyPrice)} | ${fmtPct(t.buySlippagePct)} | ${fmtTime(t.sellPivotTime)} | ${fmtPrice(t.sellPivotPrice)} | ${fmtTime(t.sellTime)} | ${fmtPrice(t.sellPrice)} | ${fmtPct(t.sellSlippagePct)} | ${fmtPct(t.profitPct)} | ${fmtDuration(t.durationMs)} |`);
+    });
+  }
+
+  lines.push('');
+  lines.push('## Detected Pivots');
+  lines.push('');
+
+  if (pivots.length === 0) {
+    lines.push('_No pivots detected._');
+  } else {
+    lines.push('| # | Symbol | Type | Price | Date & Time |');
+    lines.push('|---|---|---|---|---|');
+    pivots.forEach((p, i) => {
+      lines.push(`| ${i + 1} | ${p.symbol} | ${p.type === 'min' ? '📉 MIN' : '📈 MAX'} | ${fmtPrice(p.price)} | ${fmtDateTime(p.time)} |`);
     });
   }
 
